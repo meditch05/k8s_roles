@@ -1,0 +1,66 @@
+---
+####### Configure NFS for all the nodes ##########################################
+- name: Stop the firewall
+  service: name=ufw state=stopped enabled=no
+  #service: name=firewalld state=stopped enabled=no
+  ignore_errors: yes
+
+#- name: Stop selinux
+#  command: 'setenforce 0'
+#  ignore_errors: yes
+
+#- name: Disabled selinux
+#  selinux: state=disabled
+  
+- name: Permissive selinux
+  selinux: state=permissive
+
+- name: Install nfs-utils1
+  apt: pkg=nfs-common state=latest
+  when:
+    - install_mode == "online"
+
+- name: Install nfs-utils2
+  apt: pkg=nfs-kernel-server state=latest
+  when: 
+    - install_mode == "online"
+
+- name: Creates nfs directory
+  file: path={{ accordion_nfs_path }} state=directory
+  when: inventory_hostname in groups['master'] or
+        inventory_hostname in groups['backup-master']
+
+########################################################################
+### Configure NFS for the master 
+########################################################################
+- name: Creates data directory
+  file: path={{ accordion_nfs_path }} state=directory mode=0777
+  when: inventory_hostname in groups['master'] or
+        inventory_hostname in groups['backup-master']
+
+- name: Change owner of nfs path
+  shell: >
+    chown accordion:accordion {{ accordion_nfs_path }}
+  when: inventory_hostname in groups['master'] or
+        inventory_hostname in groups['backup-master']
+    
+# ex: echo -e "/nfs/data 192.168.132.133(rw,sync,fsid=0,no_root_squash)" >> /etc/exports
+- name: Configure nfs
+  template: src=exports.j2 dest=/etc/exports
+  when: inventory_hostname in groups['master'] or
+        inventory_hostname in groups['backup-master']
+
+- name: Enable and start nfs server
+  service: name=nfs-server state=started enabled=yes
+  when: inventory_hostname in groups['master'] or
+        inventory_hostname in groups['backup-master']
+
+- name: Exportfs
+  command: 'exportfs -a'
+  when: inventory_hostname in groups['master'] or
+        inventory_hostname in groups['backup-master']
+
+- name: Restart nfs server
+  service: name=nfs-server state=restarted
+  when: inventory_hostname in groups['master'] or
+        inventory_hostname in groups['backup-master']

@@ -1,0 +1,86 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: accordion
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      task: postgres
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  minReadySeconds: 12
+  template:
+    metadata:
+      labels:
+        task: postgres
+    spec:
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        effect: NoSchedule
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
+
+### Source Image
+      containers:
+        - image: {{ image }}
+          name: postgres
+          ports:
+            - name: tcp-port
+              containerPort: 5432
+              protocol: TCP
+#          resources:
+#             limits:
+#                cpu: 1000m
+#                memory: 1024Mi
+#             requests:
+#                cpu: 500m
+#                memory: 1024Mi
+
+### Environment Variables
+          env:
+          - name: PG_MASTER_PORT
+            value: "5432"
+#          - name: PG_MASTER_PASSWORD
+#            value: password
+          - name: PG_USER
+            value: "accordion"
+          - name: PG_PASSWORD
+            value: "1111"
+          - name: PG_DATABASE
+            value: "accordion"
+
+### Volume Mount Point
+          volumeMounts:
+          - name: data-volume
+            mountPath: /var/lib/postgresql/data
+          - name: timezone
+            mountPath: /etc/localtime
+          imagePullPolicy: Always
+### Volumes
+      volumes:
+      - name: data-volume
+        persistentVolumeClaim:
+         claimName: pgdata-pvc
+      - name: timezone
+        hostPath:
+         path: /etc/localtime
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: accordion
+  labels:
+    task: postgres
+spec:
+  ports:
+    - port: 5432
+      targetPort: 5432
+      protocol: TCP
+  selector:
+    task: postgres

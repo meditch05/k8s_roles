@@ -1,0 +1,50 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: topology-cluster-insight
+  namespace: accordion
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        task: topology-cluster-insight
+        app: cluster-insight
+        version: v2
+    spec:
+      containers:
+        - name: cluster-insight
+#          image: kubernetes/cluster-insight:v2.0-alpha
+#          image: byouloh/cluster-insight:v2.0
+          image: 127.0.0.1:30001/cluster-insight:v2.0
+          ports:
+            - name: cluster-insight
+              containerPort: 5555
+          imagePullPolicy: IfNotPresent
+        volumeMounts:
+        - name: timezone
+          mountPath: /etc/localtime
+      volumes:
+      - name: timezone
+        hostPath:
+          path: /etc/localtime
+#     imagePullSecrets:
+#       - name: regsecret
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cluster-insight
+  namespace: accordion
+  labels:
+    app: cluster-insight
+    version: v2
+spec:
+  selector:
+    app: cluster-insight
+    version: v2
+  ports:
+    - name: cluster-insight
+      port: 5555
+      targetPort: cluster-insight

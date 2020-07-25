@@ -1,0 +1,156 @@
+---
+#####################################
+# centos-00-prerequirement
+# centos-01-utils-install
+# centos-04-docker-install
+# centos-05-k8s-install
+# centos-06-k8s-init-join
+# centos-07-k8s-node-label
+# centos-08-k8s-weave
+# centos-09-helm
+# centos-10-default-http-backend-nginx-ingress
+# centos-11-create-ns
+# centos-12-nfs-client-provisioner
+# centos-13-docker-registry
+# centos-14-jenkins
+# centos-20-prometheus
+# centos-21-grafana
+# centos-22-elk
+#####################################
+
+########
+# OK
+########
+#- name: Disable firewalld / Remove swap / Copy sysctl.conf
+#  hosts: all
+#  roles:
+#    - role: centos-00-prerequirement
+
+########
+# OK
+########
+#- name: Install utils ( wget / jq )
+#  hosts: all
+#  roles:
+#    - role: centos-01-utils-install
+
+########
+# OK
+########
+#- name: Docker Install ( Install, Update /etc/hosts, Insecure registry /etc/docker/daemon.json )
+#  hosts: all
+#  roles:
+#    - role: centos-04-docker-install
+
+########
+# OK
+########
+#- name: k8s - Install
+#  hosts: all
+#  roles:
+#    - role: centos-05-k8s-install
+
+########
+# OK - kubectl get node ( NotReady )
+########
+#- name: k8s - Init and Join
+#  hosts: all
+#  roles:
+#    - role: centos-06-k8s-init-join
+
+########
+# OK
+########
+#- name: k8s - node label
+#  hosts: all
+#  roles:
+#    - role: centos-07-k8s-node-label
+
+########
+# OK - kubectl get node ( Ready )
+########
+#- name: Apply the weave-kube 1.6
+#  hosts: master
+#  roles:
+#    - role: centos-08-k8s-weave
+
+########
+# OK
+########
+#- name: Install Helm
+#  hosts: master
+#  roles:
+#    - role: centos-09-helm
+
+########
+# OK
+########
+#- name: Apply default http backend nginx ingress ( DaemonSet 8080 / 8443 )
+#  hosts: master
+#  roles:
+#    - role: centos-10-default-http-backend-nginx-ingress
+
+########
+# OK
+########
+#- name: Creat namespaces ( -n infra )
+#  hosts: master
+#  roles:
+#    - role: centos-11-create-ns
+
+########
+# OK
+########
+#- name: Set up the Dynamic Provisioner ( w/Helm, NFS client Provisioner )
+#  hosts: master
+#  roles:
+#    - role: centos-12-nfs-client-provisioner
+
+########
+# OK
+########
+#- name: Apply the Docker registry
+#  hosts: master
+#  roles:
+#    - role: centos-13-docker-registry
+
+########
+# OK
+########
+#- name: Set up the Jenkins server ( w/Helm )
+#  hosts: master
+#  roles:
+#    - role: centos-14-jenkins
+
+########
+# OK
+########
+#- name: Set up the Prometheus ( w/Helm )
+#  hosts: master
+#  roles:
+#    - role: centos-20-prometheus
+
+########
+# OK
+########
+- name: Set up the Grafana ( w/Helm )
+  hosts: master
+  roles:
+    - role: centos-21-grafana
+
+########
+# OK
+########
+#- name: Install ELK
+#  hosts: master
+#  roles:
+#    - role: centos-22-elk
+
+
+########
+# END
+########
+
+
+
+

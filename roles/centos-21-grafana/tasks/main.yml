@@ -1,0 +1,51 @@
+---
+##################################################################################
+# Grafana server
+##################################################################################
+######### NameSpace/PV/PVC #######################################################
+- name: grafana addon directory
+  file: path={{ kube_addon_dir }}/grafana state=directory
+  ignore_errors: true
+
+#- name: Put {{ kube_addon_dir }}/grafana/grafana_ns_pv_pvc.yml file
+#  template:
+#    src: grafana_ns_pv_pvc.yml.j2
+#    dest: "{{ kube_addon_dir }}/grafana/grafana_ns_pv_pvc.yml"
+#  when: inventory_hostname in groups['master']
+#
+#- name: Create a PV/PVC for grafana
+#  shell: >
+#    kubectl create -f {{ kube_addon_dir }}/grafana/grafana_ns_pv_pvc.yml
+#  ignore_errors: yes
+#  when: inventory_hostname in groups['master']
+
+######### Helm Install # #########################################################
+#- name: Generate values.yaml.grafana file
+#  shell: >
+#    helm inspect stable/grafana > values.yaml.grafana
+#  # when: inventory_hostname in groups['master']
+
+- name: Edit values.yaml.grafana file
+  copy:
+    src: values.yaml.grafana
+    dest: "{{ kube_addon_dir }}/grafana/values.yaml.grafana"
+  ignore_errors: yes
+
+- name: Install grafana ( w/helm )
+  shell: >
+    helm install --name grafana --namespace {{ prometheus_namespace }} -f {{ kube_addon_dir }}/grafana/values.yaml.grafana stable/grafana
+  when: inventory_hostname in groups['master']
+  
+######### Result #################################################################
+- name: list kubernetes pods
+  shell: >
+    kubectl get all -n {{ prometheus_namespace }}
+  changed_when: false
+  register: kubectl_get_all
+  tags:
+    - output
+
+- name: print output of "kubectl get all -n prometheus"
+  debug: msg="{{ kubectl_get_all.stdout_lines }}"
+  tags:
+    - output

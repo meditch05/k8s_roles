@@ -1,0 +1,149 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: accordion
+  namespace: accordion
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: accordion
+  strategy:
+    type: RollingUpdate
+#    rollingUpdate:
+#      maxSurge: 1
+#      maxUnavailable: 1
+  minReadySeconds: 0
+#  progressDeadlineSeconds: 
+  template:
+    metadata:
+      labels:
+        app: accordion
+    spec:
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        effect: NoSchedule
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
+
+### Node Affinity
+#      affinity:
+#       nodeAffinity:
+#         requiredDuringSchedulingIgnoredDuringExecution:
+#           nodeSelectorTerms:
+#           - matchExpressions:
+#             - key: kubernetes.io/hostname 
+#               operator: NotIn
+#               values:
+#               - master 
+### Source Image
+      containers:
+        - image: 127.0.0.1:30001/accordion:{{ accordion_ver }}
+          name: accordion
+          ports:
+            - name: http-port
+              containerPort: 8080
+              protocol: TCP
+            - name: admin-port
+              containerPort: 9990
+              protocol: TCP
+#          resources:
+#             limits:
+#                cpu: 1000m
+#                memory: 1024Mi
+#             requests:
+#                cpu: 500m
+#                memory: 1024Mi
+
+### Environment Variables
+          env:
+          - name: POD_NAME
+            valueFrom:
+             fieldRef:
+              fieldPath: metadata.name
+          - name: JAVA_OPTS
+            value: -Dcom.sun.management.jmxremote -Duser.timezone=GMT+09:00 -XX:+UseParallelGC -XX:+UseParallelOldGC -XX:+PrintGCTimeStamps -XX:+PrintGCDetails -Xloggc:$CATALINA_HOME/logs/gclog/gc_%t.log -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=$CATALINA_HOME/logs/heapdump  -Dspring.profiles.active=production -Duser.config.enable={{ download_keys_enabled }} -Dadd.node.enable={{ add_node_enabled }} -Xms1024m -Xmx1024m
+
+### Liveness && Readness Probe
+#          livenessProbe:
+#            httpGet:
+#             port: 8080
+#             path: /index.html
+#             scheme: HTTP
+#             httpHeaders:
+#              - name: X-Custom-Header
+#                value: Awesome
+#
+#            initialDelaySeconds: 15
+#            timeoutSeconds : 3
+##            periodSeconds: 10
+#            successThreshold : 1
+#            failureThreshold : 3
+#          readinessProbe:
+#            httpGet:
+#             port: 8080
+#             path: /index.html
+#             scheme: HTTP
+#             httpHeaders:
+#              - name: X-Custom-Header
+#                value: Awesome
+#
+#            initialDelaySeconds: 15
+#            timeoutSeconds : 3
+#            periodSeconds: 10
+#            successThreshold : 1
+#            failureThreshold : 3
+### Volume Mount Point
+          volumeMounts:
+          - mountPath: /etc/kubernetes/pki
+            name: k8s-certs
+            readOnly: true
+          - name: timezone
+            mountPath: /etc/localtime
+          - name: accordion-config
+            mountPath: /root/accordion/config
+          - name: accordion-license
+            mountPath: /root/accordion/license
+          - name: accordion-templates
+            mountPath: /root/accordion/templates
+#          - name: accordion-kube
+#            mountPath: /root/accordion/kube
+            #mountPath: /usr/local/tomcat/webapps/ROOT/resources/uploads/templates
+          imagePullPolicy: Always
+### Volumes
+      volumes:
+      - hostPath:
+          path: /etc/kubernetes/pki
+        name: k8s-certs
+      - name: timezone
+        hostPath:
+          path: /etc/localtime
+      - name: accordion-config
+        persistentVolumeClaim:
+          claimName: accordion-config-pvc
+      - name: accordion-license
+        persistentVolumeClaim:
+          claimName: accordion-license-pvc
+      - name: accordion-templates
+        persistentVolumeClaim:
+          claimName: accordion-templates-pvc
+#      - name: accordion-kube
+#        persistentVolumeClaim:
+#          claimName: accordion-kube-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: accordion
+  namespace: accordion
+  labels:
+    app: accordion
+spec:
+  type: NodePort
+  ports:
+    - name: accordionport
+      port: 80
+      targetPort: 8080
+      nodePort: 30000
+  selector:
+    app: accordion

@@ -1,0 +1,40 @@
+---
+##################################################################################
+# Docker Registry
+##################################################################################
+#- name: Create values.yaml
+#  shell: >
+#    helm inspect values stable/docker-registry > values.docker-registry.yaml.ori
+#  ignore_errors: yes
+#  when: inventory_hostname in groups['master']
+
+- name: Create Registry dir
+  file: path={{ kube_addon_dir }}/docker-registry state=directory mode=0777
+  ignore_errors: yes
+
+- name: Copy values.docker-registry.yaml
+  copy:
+    src: values.docker-registry.yaml
+    dest: "{{ kube_addon_dir }}/docker-registry/values.docker-registry.yaml"
+  when: inventory_hostname in groups['master']
+
+######### Helm Install # #########################################################
+- name: Install docker-registry ( w/helm )
+  shell: >
+    helm install --name docker-registry --namespace {{ docker_namespace }} -f {{ kube_addon_dir }}/docker-registry/values.docker-registry.yaml stable/docker-registry
+  ignore_errors: yes
+  when: inventory_hostname in groups['master']
+
+######### Result #################################################################
+- name: list kubernetes pods
+  shell: >
+    kubectl get all -n {{ docker_namespace }}
+  changed_when: false
+  register: kubectl_get_all
+  tags:
+    - output
+
+- name: print output of "kubectl get all -n {{ docker_namespace }}"
+  debug: msg="{{ kubectl_get_all.stdout_lines }}"
+  tags:
+    - output

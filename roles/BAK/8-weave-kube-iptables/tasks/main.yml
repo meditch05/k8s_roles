@@ -1,0 +1,25 @@
+---
+- name: Copy weave-itables.sh file
+  copy:
+    src: weave-iptables.sh 
+    dest: "/tmp/weave-iptables.sh"
+  when:
+    - network_cni == 'weave'
+    - kubernetes_version | search('1.11') or kubernetes_version | search('1.12')
+  
+- name: Mode 755 for weave-iptables.sh
+  file:
+    path: "/tmp/weave-iptables.sh"
+    mode: 0755
+  when:
+    - network_cni == 'weave'
+    - kubernetes_version | search('1.11') or kubernetes_version | search('1.12')
+
+- name: Run weave-iptables.sh
+  shell: >
+    /bin/sh -c "/tmp/weave-iptables.sh"
+  when:
+    - network_cni == 'weave'
+    - kubernetes_version | search('1.11') or kubernetes_version | search('1.12')
+  become: yes
+  ignore_errors: yes

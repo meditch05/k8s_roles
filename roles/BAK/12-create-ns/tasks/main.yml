@@ -1,0 +1,32 @@
+---
+######### Create the cluster-insight namespace #####################################
+- name: Check the accordion namespace
+  shell: "kubectl get namespaces | grep accordion"
+  delegate_to: "{{ groups['master'][0] }}"
+  run_once: true
+  register: check_namespace
+  ignore_errors: True
+
+- name: Create the accordion namespace
+  when: check_namespace|failed
+  shell: >
+    kubectl create ns accordion
+  delegate_to: "{{ groups['master'][0] }}"
+  run_once: true
+  ignore_errors: True
+
+######### Result #################################
+- name: list kubernetes' namespaces
+  shell: >
+    kubectl get ns
+  # when: inventory_hostname in groups['master'][0]
+  changed_when: false
+  register: kubectl_get_ns
+  tags:
+    - output
+
+#- name: print output of `kubectl get ns`
+#  debug: msg="{{ kubectl_get_ns.stdout_lines }}"
+#  # when: inventory_hostname in groups['master'][0]
+#  tags:
+#    - output

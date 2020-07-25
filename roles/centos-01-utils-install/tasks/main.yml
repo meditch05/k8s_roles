@@ -1,0 +1,46 @@
+---
+#- hostname: name={{ inventory_hostname }}
+#  become: yes
+
+- name: Install yum-utils
+  yum:
+    name: yum-utils
+    state: latest
+  when: 
+    - install_mode == "online"
+
+- name: Install policycoreutils-python
+  yum:
+    name: policycoreutils-python
+    state: latest
+  when: 
+    - install_mode == "online"
+
+- name: Install device-mapper-persistent-data
+  yum:
+    name: device-mapper-persistent-data
+    state: latest
+  when: 
+    - install_mode == "online"
+
+- name: Install lvm2
+  yum:
+    name: lvm2
+    state: latest
+  when: 
+    - install_mode == "online"
+
+- name: Install wget
+  yum:
+    name: wget
+    state: present
+
+- name: Install NFS
+  shell: >
+    yum install -y nfs-utils nfs-utils-lib showmount
+  ignore_errors: yes
+
+- name: Install jq
+  shell: >
+    wget -O /usr/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.5/jq-linux64 && chmod 755 /usr/bin/jq
+  ignore_errors: yes

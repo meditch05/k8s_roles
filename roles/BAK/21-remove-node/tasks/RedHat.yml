@@ -1,0 +1,74 @@
+---
+- name: reset nodes
+  shell: "kubeadm reset"
+  when:
+    - kubernetes_version | search('1.9')
+    - inventory_hostname in groups['minions'] or inventory_hostname in groups['infra']
+  register: kubeadm_reset_command
+  tags:
+    - output
+
+- name: reset nodes
+  shell: "kubeadm reset"
+  when:
+    - kubernetes_version | search('1.10')
+    - inventory_hostname in groups['minions'] or inventory_hostname in groups['infra']
+  register: kubeadm_reset_command
+  tags:
+    - output
+
+- name: reset nodes
+  shell: "kubeadm reset -f"
+  when:
+    - kubernetes_version | search('1.11') or kubernetes_version | search('1.12')
+    - inventory_hostname in groups['minions'] or inventory_hostname in groups['infra']
+  register: kubeadm_reset_command
+  tags:
+    - output
+
+- name: Remove all semaphores
+  file:
+    dest: "{{ item }}"
+    state: absent
+  with_items:
+    - "/etc/.kubeadm-complete"
+    - "/etc/.kubeadm-joined"
+  when: inventory_hostname in groups['minions'] or inventory_hostname in groups['infra']
+
+- name: stop nfs-server
+  service:
+    name: nfs-server
+    state: stopped
+  ignore_errors: True
+  when: inventory_hostname in groups['minions'] or inventory_hostname in groups['infra']
+
+- name: Remove nfs-utils
+  yum: name=nfs-utils state=absent
+  when: inventory_hostname in groups['minions'] or inventory_hostname in groups['infra']
+
+- name: Remove kubectl
+  yum: name=kubectl-{{ kubernetes_version }}-0.x86_64 state=absent
+  when: inventory_hostname in groups['minions'] or inventory_hostname in groups['infra']
+
+
+- name: Remove kubelet
+  yum: name=kubelet-{{ kubernetes_version }}-0.x86_64 state=absent
+  when: inventory_hostname in groups['minions'] or inventory_hostname in groups['infra']
+
+
+- name: Remove kubeadm
+  yum: name=kubeadm-{{ kubernetes_version }}-0.x86_64 state=absent
+  when: inventory_hostname in groups['minions'] or inventory_hostname in groups['infra']
+
+
+- name: Remove kubernetes-cni
+  yum: name=kubernetes-cnt-{{ kubernetes_version }}-0.x86_64 state=absent
+  when: inventory_hostname in groups['minions'] or inventory_hostname in groups['infra']
+
+- name: Remove docker
+  yum: name=docker state=absent
+  when: inventory_hostname in groups['minions'] or inventory_hostname in groups['infra']
+
+- name: Restart rpcbind
+  service: name=rpcbind state=restarted
+  when: inventory_hostname in groups['minions'] or inventory_hostname in groups['infra']

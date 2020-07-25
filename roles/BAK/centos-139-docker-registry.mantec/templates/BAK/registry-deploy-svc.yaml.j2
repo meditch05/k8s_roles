@@ -1,0 +1,116 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: registry
+  namespace: {{ namespace }}
+  labels:
+    k8s-app: registry
+spec:
+  replicas: 1
+  selector:
+    k8s-app: registry
+  template:
+    metadata:
+      labels:
+        k8s-app: registry
+    spec:
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - preference:
+              matchExpressions:
+              - key: accordion-role
+                operator: In
+                values:
+                - {{ node_role }}
+            weight: 100
+      tolerations:
+      - effect: NoSchedule
+        key: accordion-role
+        operator: Equal
+        value: {{ node_role }}
+      containers:
+      - name: registry
+        image: registry:2
+        resources:
+          # keep request = limit to keep this container in guaranteed class
+          limits:
+            cpu: 500m
+            memory: 100Mi
+          requests:
+            cpu: 500m
+            memory: 100Mi
+        env:
+        - name: REGISTRY_HTTP_ADDR
+          value: :5000
+        - name: REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY
+          value: /var/lib/registry
+        - name: REGISTRY_HTTP_TLS_CERTIFICATE
+          value: /certs/domain.crt
+        - name: REGISTRY_HTTP_TLS_KEY
+          value: /certs/domain.key
+        - name: REGISTRY_AUTH_HTPASSWD_REALM
+          value: basic_realm
+        - name: REGISTRY_AUTH_HTPASSWD_PATH
+          value: /auth/htpasswd
+        volumeMounts:
+        - name: image-store
+          mountPath: /var/lib/registry
+        - name: cert-dir
+          mountPath: /certs
+        - name: auth-dir
+          mountPath: /auth
+        - name: timezone
+          mountPath: /etc/localtime
+        ports:
+        - containerPort: 5000
+          name: registry
+          protocol: TCP
+#      - name: registry-ui
+#        image: konradkleine/docker-registry-frontend:v2
+#        env:
+#        - name: ENV_DOCKER_REGISTRY_HOST
+#          value: "localhost"
+#        - name: ENV_DOCKER_REGISTRY_PORT
+#          value: "5000"
+#        - name: ENV_DOCKER_REGISTRY_USE_SSL
+#          value: "1"
+#        ports:
+#        - containerPort: 80
+#          name: registry
+#          protocol: TCP
+      volumes:
+      - name: image-store
+        persistentVolumeClaim:
+          claimName: registry-pvc
+      - name: cert-dir
+        secret:
+          secretName: registry-secret
+      - name: auth-dir
+        secret:
+          secretName: basic-auth
+      - name: timezone
+        hostPath:
+          path: /etc/localtime
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: registry
+  namespace: {{ namespace }}
+  labels:
+    k8s-app: registry
+    kubernetes.io/name: "KubeRegistry"
+spec:
+  selector:
+    k8s-app: registry
+  type: NodePort
+  ports:
+  - name: registry
+    port: 5000
+    protocol: TCP
+    nodePort: {{ nodePort }}
+#  - name: registry-ui
+#    port: 80
+#    protocol: TCP
+#    nodePort: 32001

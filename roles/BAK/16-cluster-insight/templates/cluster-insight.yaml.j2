@@ -1,0 +1,64 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+ name: topology-cluster-insight
+ namespace: {{ namespace }}
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        task: topology-cluster-insight
+        app: cluster-insight
+        version: v2
+    spec:
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - preference:
+              matchExpressions:
+              - key: accordion-role
+                operator: In
+                values:
+                - {{ node_role }}
+            weight: 100
+      tolerations:
+      - effect: NoSchedule
+        key: accordion-role
+        operator: Equal
+        value: {{ node_role }}
+      containers:
+        - name: cluster-insight
+          image: {{ image }}
+          ports:
+            - name: cluster-insight
+              containerPort: 5555
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+          - name: timezone
+            mountPath: /etc/localtime
+#     imagePullSecrets:
+#       - name: regsecret
+      volumes:
+      - name: timezone
+        hostPath:
+          path: /etc/localtime
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cluster-insight
+  namespace: {{ namespace }}
+  labels:
+    app: cluster-insight
+    version: v2
+spec:
+  type: NodePort
+  selector:
+    app: cluster-insight
+    version: v2
+  ports:
+    - name: cluster-insight
+      port: 5555
+      targetPort: cluster-insight
+      nodePort: {{ nodePort }}

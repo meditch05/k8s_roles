@@ -1,0 +1,93 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: registry
+  namespace: {{ docker_namespace }}
+  labels:
+    k8s-app: registry
+spec:
+  replicas: 1
+  selector:
+    k8s-app: registry
+  template:
+    metadata:
+      labels:
+        k8s-app: registry
+    spec:
+      nodeSelector:
+        node-role.kubernetes.io/master: "true"
+      tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master
+        operator: Exists
+#      affinity:
+#        nodeAffinity:
+#          preferredDuringSchedulingIgnoredDuringExecution:
+#          - preference:
+#              matchExpressions:
+#              - key: accordion-role
+#                operator: In
+#                values:
+#                - {{ docker_registry_role }}
+#            weight: 100
+#      tolerations:
+#      - effect: NoSchedule
+#        key: accordion-role
+#        operator: Equal
+#        value: {{ node_role }}
+      containers:
+      - name: registry
+#        image: accordion/registry:2
+        image: registry:2
+        imagePullPolicy: IfNotPresent
+        # keep request = limit to keep this container in guaranteed class
+#        resources:
+#          limits:
+#            cpu: 500m
+#            memory: 100Mi
+#          requests:
+#            cpu: 500m
+#            memory: 100Mi
+        env:
+        - name: REGISTRY_HTTP_ADDR
+          value: :5000
+        - name: REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY
+          value: /var/lib/registry
+        - name: REGISTRY_HTTP_TLS_CERTIFICATE
+          value: /certs/domain.crt
+        - name: REGISTRY_HTTP_TLS_KEY
+          value: /certs/domain.key
+        volumeMounts:
+        - name: image-store
+          mountPath: /var/lib/registry
+        - name: cert-dir
+          mountPath: /certs
+        - name: timezone
+          mountPath: /etc/localtime
+        ports:
+        - containerPort: 5000
+          name: registry
+          protocol: TCP
+#      - name: registry-ui
+#        image: konradkleine/docker-registry-frontend:v2
+#        env:
+#        - name: ENV_DOCKER_REGISTRY_HOST
+#          value: "localhost"
+#        - name: ENV_DOCKER_REGISTRY_PORT
+#          value: "5000"
+#        - name: ENV_DOCKER_REGISTRY_USE_SSL
+#          value: "1"
+#        ports:
+#        - containerPort: 80
+#          name: registry
+#          protocol: TCP
+      volumes:
+      - name: image-store
+        persistentVolumeClaim:
+          claimName: registry-pvc
+      - name: cert-dir
+        secret:
+          secretName: registry-secret
+      - name: timezone
+        hostPath:
+          path: /etc/localtime

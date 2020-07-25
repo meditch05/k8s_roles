@@ -1,0 +1,179 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logstash-tomcat
+  namespace: logcenter
+data:
+  logstash.yml: |-
+    node.name: logstash.tomcat
+  
+    http.host: "0.0.0.0"
+    http.port: 9600
+
+    # path.config: "/usr/share/logstash/pipeline/" # Default
+
+    xpack.monitoring.enabled: true
+    xpack.monitoring.elasticsearch.hosts: [ "http://elasticsearch-master.monitoring.svc.cluster.local:9200" ]
+
+    #EOF
+
+  #pipelines.yml: |-
+  #  - pipeline.id: accesslog_skt
+  #    pipeline.workers: 1
+  #    pipeline.batch.size: 1
+  #    path.config: "/usr/share/logstash/config/pipeline-tomcat.conf"
+  #    #path.config: "/usr/share/logstash/pipeline/pipeline-tomcat.conf"
+   
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logstash-tomcat-pipeline
+  namespace: logcenter
+data:
+  pipeline-tomcat.conf: |-
+    input {
+      beats {
+        host => "0.0.0.0"
+        port => "5044"
+      }
+    }
+    filter {
+
+      mutate { 
+        add_field => { 
+          "utc_timestamp" => "%{@timestamp}"
+          "kst_timestamp" => ""
+        } 
+      } 
+       
+      date { 
+        match => [ "utc_timestamp", "ISO8601" ] 
+        # target => "local_yyyymmdd" 
+      } 
+    
+      ruby { 
+        # code => "event.set('kst_timestamp',  event.get('@timestamp').time.localtime('+09:00').strftime('%Y-%m-%d %H:%M:%S'))"  # OK. Korea Time
+        # code => "event.set('kst_timestamp', event.get('@timestamp').time.localtime('+09:00').strftime('%Y%m%d_%H%M%S'))"       # OK. Korea Time
+        # code => "event.set('kst_timestamp', event.get('@timestamp').time.localtime('+09:00').strftime('%Y-%m-%d_%H%M%S'))"     # OK. Korea Time
+        code => "event.set('kst_timestamp', event.get('@timestamp').time.localtime('+09:00').strftime('%Y%m%d'))" 
+      } 
+       
+      #grok { 
+      #  match => { "kst_timestamp" => "%{?<yyyy:[0-9]{4}}-%{MONTHNUM:mm}-%{MONTHDAY:dd}_%{GREEDYDATA:dummy}" } 
+      #
+      #  # add_field => { "local_yyymmddHMS" => "%{yyyy}%{mm}%{dd}-%{dummy}" }
+      #  # add_field => { "[@metadata][yymmdd]" => "%{yy}%{mm}%{dd}-%{dummy}" }
+      #  # remove_field => [ "yy", "mm", "dd", "kst_timestamp" ] 
+      #  # remove_field => [ "yy", "mm", "dd" ] 
+      #} 
+      
+    }
+
+    output {
+
+      stdout { codec => rubydebug }
+
+      elasticsearch {
+        hosts => ["http://elasticsearch-master.monitoring.svc.cluster.local:9200"]
+        index => "logstash-%{[@metadata][beat]}-tomcat-%{+YYYY.MM.dd}"
+      }
+
+      file {
+        # path => "/applog/%{@timestamp}.log"              # Worked
+        # path => "/applog/%{source}.log"                  # Worked - /applog/software/jeus/logs/JeusServer_20190806.log.log
+        # path => "/applog/%{[host][name]}.%{file_name}"   # Worked - /applog/filebeat.jeus.skt-infmon01.webwas.JeusServer_20190806.log.log
+        # path => "/applog/%{[beat][name]}.%{[file_name]}" # Worked - /applog/filebeat.jeus.skt-infmon01.webwas.JeusServer_20190806.log.log
+        # path => "/applog/%{[beat][name]}.%{[file_name]}" # Worked - /applog/filebeat.jeus.skt-infmon01.webwas.JeusServer_20190806.log.log
+        # path => "/applog/%{yyyymmdd}/%{[beat][name]}.%{jeuslog}_%{yyyymmdd}.log"  # /applog/20190806/filebeat.jeus.skt-infmon01.webwas.JeusServer_20190806.log
+      
+        path => "/applog/%{kst_timestamp}/%{[beat][name]}"
+        codec => line { format => "%{message}" }
+      }
+
+    }
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: logstash-pvc-tomcat
+  namespace: logcenter
+  annotations:
+    volume.beta.kubernetes.io/storage-class: "nfs-client"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Gi
+---
+kind: Deployment
+apiVersion: extensions/v1beta1
+metadata:
+  name: logstash-tomcat
+  namespace: logcenter
+spec:
+  template:
+    metadata:
+      labels:
+        app: logstash-for-accesslog
+    spec:
+      containers:
+      - name: logstash
+        ports:
+          - containerPort: 5044
+            name: filebeat
+          - containerPort: 9600
+            name: logstash
+        image: docker.elastic.co/logstash/logstash:7.1.0
+        volumeMounts:
+        - name: logstash-tomcat           # for default logstash.yml
+          mountPath: /usr/share/logstash/config/logstash.yml
+          subPath: logstash.yml
+        - name: logstash-tomcat-pipeline  # for default 
+          mountPath: /usr/share/logstash/pipeline/pipeline-tomcat.conf
+          subPath: pipeline-tomcat.conf
+        - name: logstash-pvc-tomcat
+          mountPath: /applog
+        command:
+        - logstash
+        - -f
+        - /usr/share/logstash/pipeline/pipeline-tomcat.conf
+        # - --config.reload.automatic
+        # - /usr/share/logstash/pipeline/mtwd-accesslog-parse.conf
+      volumes:
+      - name: logstash-tomcat
+        configMap:
+          name: logstash-tomcat
+          defaultMode: 420
+      - name: logstash-tomcat-pipeline
+        configMap:
+          name: logstash-tomcat-pipeline
+          defaultMode: 420
+      - name: logstash-pvc-tomcat
+        persistentVolumeClaim:
+          claimName: logstash-pvc-tomcat
+      nodeSelector:
+        node-role.kubernetes.io/management: "true"
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: logstash-tomcat
+  namespace: logcenter
+spec:
+  type: NodePort
+  selector:
+    app: logstash-for-accesslog
+  ports:
+  - name: filebeat
+    protocol: TCP
+    port: 5044
+    targetPort: 5044
+    nodePort: 31000    # tomcat
+  - name: logstash
+    protocol: TCP
+    port: 9600
+    targetPort: 9600
+    nodePort: 31001    # tomcat

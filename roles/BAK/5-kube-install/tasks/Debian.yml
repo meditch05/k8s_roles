@@ -1,0 +1,136 @@
+---
+- name: add Kubernetes apt-key
+  apt_key: 
+    url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+    state: present
+  when: 
+    - install_mode == "online"
+
+- name: add Kubernetes APT repository
+  apt_repository:
+    repo: deb http://apt.kubernetes.io/ kubernetes-xenial main
+    state: present
+#    filename: 'kubernetes'
+  when:
+    - install_mode == "online"
+      
+#- name: Install required packages-1
+#  #apt: pkg=kubectl-{{ kubernetes_version }}-0.x86_64
+#  apt: pkg=kubectl
+#  when:
+#    - install_mode == "online"
+
+#- name: Install required packages-2
+#apt: pkg=kubelet-{{ kubernetes_version }}-0.x86_64
+#  apt: pkg=kubelet
+#  when:
+#    - install_mode == "online"
+
+#- name: Install required packages-3
+#  apt: pkg=kubeadm-{{ kubernetes_version }}-0.x86_64
+#  apt: pkg=kubeadm
+#  when:
+#    - install_mode == "online"
+
+#- name: Install required packages-4
+#  apt: pkg=kubernetes-cni
+#  when:
+#    - install_mode == "online"
+
+- name: kubectl v1.10.11 download
+  shell: curl -Lo kubectl https://storage.googleapis.com/kubernetes-release/release/v1.10.11/bin/linux/amd64/kubectl && chmod +x kubectl && sudo mv kubectl /usr/bin/.
+  when:
+    - install_mode == "online"
+
+- name: kubeadm v1.10.11 download
+  shell: curl -Lo kubeadm https://storage.googleapis.com/kubernetes-release/release/v1.10.11/bin/linux/amd64/kubeadm && chmod +x kubeadm && sudo mv kubeadm /usr/bin/.
+  when: 
+    - install_mode == "online"
+
+- name: kubelet v1.10.11 download
+  shell: curl -Lo kubelet https://storage.googleapis.com/kubernetes-release/release/v1.10.11/bin/linux/amd64/kubelet && chmod +x kubelet && sudo mv kubelet /usr/bin/.
+  when:  
+    - install_mode == "online"
+
+- name: kubernetes-cni download
+  apt: pkg=kubernetes-cni
+  when:
+    - install_mode == "online"
+
+- name: Lock versions
+  shell: >
+    #sudo yum versionlock add kubectl kubelet kubeadm
+    sudo apt-mark hold kubernetes-cni docker
+
+- name: Set bridge-nf-call-iptables to 1
+  shell: >
+    echo "1" > /proc/sys/net/bridge/bridge-nf-call-iptables
+
+- name: Set bridge-nf-call-ip6tables to 1
+  shell: >
+    echo "1" > /proc/sys/net/bridge/bridge-nf-call-ip6tables
+
+- name: kubelet directory
+  file: path=/etc/systemd/system/kubelet.service.d state=directory
+  ignore_errors: True
+
+- name: Template kubeadm 
+  template:
+    src: 10-kubeadm.j2
+    dest: /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+  when: inventory_hostname in groups['master']
+
+- name: Template kubeadm  (backup)
+  template:
+    src: 10-kubeadm-backup.j2
+    dest: /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+  when: inventory_hostname in groups['backup-master'] or inventory_hostname in groups['minions'] or inventory_hostname in groups['infra']
+
+- name: detect docker's cgroup-driver
+  shell: docker info 2>/dev/null |grep -i cgroup | cut -d":" -f2 | tr -d " "
+  register: docker_cgroup_driver
+  
+- replace:
+    path: /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+    regexp: '--cgroup-driver=(systemd|cgroupfs)'
+    replace: '--cgroup-driver={{docker_cgroup_driver.stdout}}'
+    backup: no
+  ignore_errors: yes
+
+- name: Set alias k
+  shell: >
+    echo "k='kubectl'" > /root/.bashrc
+
+- name: Set alias kinfo
+  shell: >
+    echo "kinfo='kubectl get svc,po --all-namespaces -o wide'" > /root/.bashrc
+
+- name: source bashrc
+  shell: source ~/.bashrc
+  args:
+    executable: /bin/bash
+
+#- name: Copy kubelet.service file
+#  copy:
+#    src: kubelet.service
+#    dest: /etc/systemd/system/kubelet.service
+- name: kubelet service
+  template:
+     src: kubelet.service
+     dest: /etc/systemd/system/kubelet.service
+
+- name: Reload systemd units after changing 10-kubeadm.conf
+  command: systemctl daemon-reload
+
+- name: Start and enable services-1
+  service:
+    name: kubelet
+    state: restarted
+
+- name: Start and enable services-2
+  service:
+    name: docker
+    state: restarted
+
+- name: sources.list.d delete
+  command: "rm -rf /etc/apt/sources.list.d/kubernetes.list"

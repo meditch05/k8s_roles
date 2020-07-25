@@ -1,0 +1,74 @@
+---
+##################################################################################
+# Prometheus server
+##################################################################################
+- name: Create prometheus addon directory
+  file: path={{ kube_addon_dir }}/prometheus state=directory
+  ignore_errors: true
+
+#- name: Put {{ kube_addon_dir }}/prometheus/prometheus_ns_pv_pvc.yml file
+#  template:
+#    src: prometheus_ns_pv_pvc.yml.j2
+#    dest: "{{ kube_addon_dir }}/prometheus/prometheus_ns_pv_pvc.yml"
+#  when: inventory_hostname in groups['master']
+
+#- name: Create a PV/PVC for prometheus
+#  shell: >
+#    kubectl create -f {{ kube_addon_dir }}/prometheus/prometheus_ns_pv_pvc.yml
+#  ignore_errors: yes
+#  when: inventory_hostname in groups['master']
+
+######### Helm Install # #########################################################
+#- name: Generate values.yaml.prometheus file
+#  shell: >
+#    helm inspect stable/prometheus > values.yaml.prometheus
+#  # when: inventory_hostname in groups['master']
+
+- name: Edit values.yaml.prometheus file
+  copy:
+    src: values.yaml.prometheus
+    dest: "{{ kube_addon_dir }}/prometheus/values.yaml.prometheus"
+  ignore_errors: yes
+
+- name: Install prometheus ( w/helm )
+  shell: >
+    helm install --name prometheus --namespace {{ prometheus_namespace }} -f {{ kube_addon_dir }}/prometheus/values.yaml.prometheus stable/prometheus
+  when: inventory_hostname in groups['master']
+
+######### Apply additional ingress, configmap #################################################################
+- name: Copy ingress.alertmanager.yml
+  copy:
+    src: ingress.alertmanager.yml
+    dest: "{{ kube_addon_dir }}/prometheus/ingress.alertmanager.yml"
+  ignore_errors: yes
+  
+- name: Copy prometheus-alertmanager.configmap.yaml
+  copy:
+    src: prometheus-alertmanager.configmap.yaml
+    dest: "{{ kube_addon_dir }}/prometheus/prometheus-alertmanager.configmap.yaml"
+  ignore_errors: yes
+
+- name: Copy prometheus-server.configmap.yaml
+  copy:
+    src: prometheus-server.configmap.yaml
+    dest: "{{ kube_addon_dir }}/prometheus/prometheus-server.configmap.yaml"
+  ignore_errors: yes
+
+- name: Apply additional ingress, configmap
+  shell: >
+    kubectl apply -f {{ kube_addon_dir }}/prometheus/ingress.alertmanager.yml -f {{ kube_addon_dir }}/prometheus/prometheus-alertmanager.configmap.yaml -f {{ kube_addon_dir }}/prometheus/prometheus-server.configmap.yaml
+  when: inventory_hostname in groups['master']
+
+######### Result #################################################################
+- name: list kubernetes pods
+  shell: >
+    kubectl get all -n {{ prometheus_namespace }}
+  changed_when: false
+  register: kubectl_get_all
+  tags:
+    - output
+
+- name: print output of "kubectl get all -n {{ prometheus_namespace }}"
+  debug: msg="{{ kubectl_get_all.stdout_lines }}"
+  tags:
+    - output

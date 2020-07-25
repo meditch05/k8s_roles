@@ -1,0 +1,308 @@
+---
+###############################################################
+# Accordion Upgrade v1.2.0.7 > v1.3.0.1
+###############################################################
+- name: Copy weave
+  copy: src=weave dest=/usr/local/bin/weave
+  ignore_errors: True
+  when:
+    - network_cni == 'weave'
+
+- name: "Mode 755 for weave"
+  file:
+    path: "/usr/local/bin/weave"
+    mode: 0755
+  when:
+    - network_cni == 'weave'
+
+- name: weave network reset
+  shell: >
+    weave reset
+  ignore_errors: True
+  when:
+    - network_cni == 'weave'
+
+- name: upgrade tmp directory
+  file: path=/tmp/upgrade state=directory
+  register: upgrade_tmp_dir
+  ignore_errors: True
+
+- name: Copy dockers
+  synchronize:
+    src: "{{ docker_path }}"
+    dest: /tmp/upgrade
+  when: inventory_hostname in groups['minions'] or inventory_hostname in groups['infra'] or inventory_hostname in groups['backup-master']
+
+- name: Copy rpms
+  synchronize:
+    src: "{{ rpm_path }}"
+    dest: /tmp/upgrade
+  when: inventory_hostname in groups['minions'] or inventory_hostname in groups['infra'] or inventory_hostname in groups['backup-master']
+
+- name: "Mode 755 for docker_load.sh (master)"
+  file:
+    path: "{{ docker_path }}/docker_load.sh"
+    mode: 0755
+  when: inventory_hostname in groups['master']
+  
+- name: Run docker-install (master)
+  shell: >
+    /bin/sh -c "{{ docker_path }}/docker_load.sh"
+  args:
+    chdir: "{{ docker_path }}"
+  when: inventory_hostname in groups['master']
+  
+- name: "Mode 755 for docker_load.sh"
+  file:
+    path: "/tmp/upgrade/docker/docker_load.sh"
+    mode: 0755
+  when: inventory_hostname in groups['minions'] or inventory_hostname in groups['infra'] or inventory_hostname in groups['backup-master']
+  
+- name: Run docker-install (nodes)
+  shell: >
+    /bin/sh -c "/tmp/upgrade/docker/docker_load.sh"
+  args:
+    chdir: "/tmp/upgrade/docker"
+  when: inventory_hostname in groups['minions'] or inventory_hostname in groups['infra'] or inventory_hostname in groups['backup-master']
+
+- name: Install jq (master)
+  shell: >
+    rpm -Uvh --force --nodeps {{ rpm_path }}/jq/*.rpm
+  when: inventory_hostname in groups['master']
+
+- name: Install kubernetes 1.11.6 (master)
+  shell: >
+    rpm -Uvh --force --nodeps {{ rpm_path }}/6_kube/*.rpm  
+  when: inventory_hostname in groups['master']
+  
+- name: Install kubernetes 1.11.6 (nodes)
+  shell: >
+    rpm -Uvh --force --nodeps /tmp/upgrade/rpm/6_kube/*.rpm
+  when: inventory_hostname in groups['minions'] or inventory_hostname in groups['infra'] or inventory_hostname in groups['backup-master']
+
+- name: Kubernetes Upgrade v1.11.6
+  shell: >
+    kubeadm upgrade apply -f v1.11.6
+  when: inventory_hostname in groups['master']
+  
+############### kubelet Setting ###############################
+
+- name: Template config.yaml
+  template:
+    src: config.yaml.j2
+    dest: /var/lib/kubelet/config.yaml
+  when:
+    - inventory_hostname in groups['master'] or inventory_hostname in groups['minions'] or inventory_hostname in groups['infra']
+    - kubernetes_version | search('1.11')
+
+- name: Template kubeadm-flags.env
+  template:
+    src: kubeadm-flags.env.j2
+    dest: /var/lib/kubelet/kubeadm-flags.env
+  when:
+    - inventory_hostname in groups['master'] or inventory_hostname in groups['minions'] or inventory_hostname in groups['infra']
+    - kubernetes_version | search('1.11')
+    
+- name: Template kubelet
+  template:
+    src: kubelet.j2
+    dest: /etc/sysconfig/kubelet
+  when:
+    - inventory_hostname in groups['master'] or inventory_hostname in groups['minions'] or inventory_hostname in groups['infra']
+    - kubernetes_version | search('1.11')
+
+- name: Reload changing kubelet
+  command: systemctl daemon-reload
+
+- name: Start and enable services
+  service:
+    name: "{{ item }}"
+    state: restarted
+    enabled: yes
+  with_items:
+    - kubelet
+  
+############### Accordion & image Upgrade #####################
+- wait_for:
+    host: 127.0.0.1
+    port: "6443"
+    delay: 10
+  when: inventory_hostname in groups['master']
+
+- name: upgrade addon directory
+  file: path={{ kube_addon_dir }}/upgrade state=directory
+  register: upgrade_addon_dir
+  ignore_errors: True
+  when: inventory_hostname in groups['master']
+
+- name: addon directory-1 
+  file: path={{ kube_addon_dir }}/upgrade/create state=directory
+  register: upgrade_addon_dir
+  ignore_errors: True
+  when: inventory_hostname in groups['master']
+
+- name: addon directory-2
+  file: path={{ kube_addon_dir }}/upgrade/delete state=directory
+  register: upgrade_addon_dir
+  ignore_errors: True
+  when: inventory_hostname in groups['master']
+
+- name: Copy weave.yaml file(delete)
+  shell: >
+    cp {{ kube_addon_dir }}/weave/weave.yaml {{ kube_addon_dir }}/upgrade/delete/weave.yaml
+  when: 
+    - network_cni == 'weave'
+    - inventory_hostname in groups['master']
+    
+- name: Delete weave.yaml
+  shell: >
+    kubectl delete -f {{ kube_addon_dir }}/upgrade/delete/weave.yaml
+  ignore_errors: True
+  when:
+    - network_cni == 'weave' 
+    - inventory_hostname in groups['master']
+
+- name: Copy weave.yaml file(create)
+  template:
+    src: weave.yaml.j2
+    dest: "{{ kube_addon_dir }}/upgrade/create/weave.yaml"
+  when:
+    - network_cni == 'weave'
+    - inventory_hostname in groups['master']
+
+- name: Deploy weave.yaml
+  shell: >
+    kubectl apply -f {{ kube_addon_dir }}/upgrade/create/weave.yaml
+  ignore_errors: True
+  when: 
+    - network_cni == 'weave'
+    - inventory_hostname in groups['master']
+
+- wait_for:
+    host: 127.0.0.1
+    port: "6783"
+    delay: 10
+
+- name: Copy accordion-deploy-svc.yaml file(create)
+  copy:
+    src: accordion-deploy-svc.yaml
+    dest: "{{ kube_addon_dir }}/upgrade/create/accordion-deploy-svc.yaml"
+  when: inventory_hostname in groups['master']
+
+- name: Deploy accordion-deploy-svc.yaml
+  shell: >
+    kubectl apply -f {{ kube_addon_dir }}/upgrade/create/accordion-deploy-svc.yaml
+  ignore_errors: True
+  when: inventory_hostname in groups['master']
+
+- name: Copy elasticsearch-rc-svc.yaml file(delete)
+  shell: >
+    cp {{ kube_addon_dir }}/elk/elasticsearch-rc-svc.yaml {{ kube_addon_dir }}/upgrade/delete/elasticsearch-rc-svc.yaml
+  when: inventory_hostname in groups['master']
+
+- name: Copy elasticsearch-rc-svc.yaml file(create)
+  copy:
+    src: elasticsearch-rc-svc.yaml
+    dest: "{{ kube_addon_dir }}/upgrade/create/elasticsearch-rc-svc.yaml"
+  when: inventory_hostname in groups['master']
+
+- name: Delete elasticsearch-rc-svc.yaml(v2.4.1-3)
+  shell: >
+    kubectl delete -f {{ kube_addon_dir }}/upgrade/delete/elasticsearch-rc-svc.yaml
+  ignore_errors: True
+  when: inventory_hostname in groups['master']
+
+- name: Deploy elasticsearch-rc-svc.yaml(v6.3.0)
+  shell: >
+    kubectl apply -f {{ kube_addon_dir }}/upgrade/create/elasticsearch-rc-svc.yaml
+  ignore_errors: True
+  when: inventory_hostname in groups['master']
+
+- name: Copy metrics-server.yaml file(create)
+  template:
+    src: metrics-server.yaml.j2
+    dest: "{{ kube_addon_dir }}/upgrade/create/metrics-server.yaml"
+  when: inventory_hostname in groups['master']
+
+- name: Deploy metrics-server.yaml
+  shell: >
+    kubectl apply -f {{ kube_addon_dir }}/upgrade/create/metrics-server.yaml
+  ignore_errors: True
+  when: inventory_hostname in groups['master']
+
+- name: Copy elasticsearch-rc-svc.yaml file(delete)
+  shell: >
+    cp {{ kube_addon_dir }}/default/defautl-http-backend-nginx-ingress-controller.yaml {{ kube_addon_dir }}/upgrade/delete/defautl-http-backend-nginx-ingress-controller.yaml
+  when: inventory_hostname in groups['master']
+
+- name: Copy defautl-http-backend-nginx-ingress-controller.yaml file(create)
+  copy:
+    src: defautl-http-backend-nginx-ingress-controller.yaml
+    dest: "{{ kube_addon_dir }}/upgrade/create/defautl-http-backend-nginx-ingress-controller.yaml"
+  when: inventory_hostname in groups['master']
+
+- name: Delete defautl-http-backend-nginx-ingress-controller.yaml
+  shell: >
+    kubectl delete -f {{ kube_addon_dir }}/upgrade/delete/defautl-http-backend-nginx-ingress-controller.yaml -n kube-system
+  ignore_errors: True
+  when: inventory_hostname in groups['master']
+
+- name: Deploy defautl-http-backend-nginx-ingress-controller.yaml
+  shell: >
+    kubectl apply -f {{ kube_addon_dir }}/upgrade/create/defautl-http-backend-nginx-ingress-controller.yaml -n kube-system
+  ignore_errors: True
+  when: inventory_hostname in groups['master']
+
+- name: Delete topology-role.yaml
+  shell: >
+    kubectl delete clusterrolebinding accordion-add-on-cluster-admin
+  when: inventory_hostname in groups['master']
+  
+- name: Create topology-role.yaml
+  shell: >
+    kubectl create clusterrolebinding accordion-add-on-cluster-admin --clusterrole=cluster-admin   --serviceaccount=accordion:default --group=accordion-add-on-cluster-admin
+  when: inventory_hostname in groups['master']
+
+############## Accordion ConfigMap ####################################
+
+- name: Configmap addon directory
+  file: path={{ kube_addon_dir }}/accordion/configmaps state=directory
+  register: accordion_configmap_dir
+  ignore_errors: True
+  when: inventory_hostname in groups['master']
+
+- name: Copy accesslog-template.yaml
+  copy:
+    src: accesslog-template.yaml
+    dest: "{{ kube_addon_dir }}/accordion/configmaps/accesslog-template.yaml"
+  when: inventory_hostname in groups['master']
+
+- name: Copy tomcat-fluentd-config.yaml
+  copy:
+    src: tomcat-fluentd-config.yaml
+    dest: "{{ kube_addon_dir }}/accordion/configmaps/tomcat-fluentd-config.yaml"
+  when: inventory_hostname in groups['master']
+
+- name: Copy wildfly-fluentd-config.yaml
+  copy:
+    src: wildfly-fluentd-config.yaml
+    dest: "{{ kube_addon_dir }}/accordion/configmaps/wildfly-fluentd-config.yaml"
+  when: inventory_hostname in groups['master']
+
+- name: Copy configmap.sh
+  copy:
+    src: configmap.sh
+    dest: "{{ kube_addon_dir }}/accordion/configmaps/configmap.sh"
+  when: inventory_hostname in groups['master']
+
+- name: "Mode 755 for configmap.sh"
+  file:
+    path: "{{ kube_addon_dir }}/accordion/configmaps/configmap.sh"
+    mode: 0755
+  when: inventory_hostname in groups['master']
+
+- name: Run configmap.sh
+  shell: >
+    /bin/sh -c "{{ kube_addon_dir }}/accordion/configmaps/configmap.sh"
+  when: inventory_hostname in groups['master']
+

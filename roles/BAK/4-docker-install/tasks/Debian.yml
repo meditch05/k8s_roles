@@ -1,0 +1,120 @@
+---
+- name: remove docker
+  apt:
+    name: "{{ item }}"
+    state: absent
+  with_items:
+    - docker
+    - docker-common
+    - docker-selinux
+    - docker-engine
+    - container-selinux
+  when: 
+    - install_mode == "online"
+
+- name: Install python setup tools
+  apt: pkg=python-setuptools
+  when: 
+    - install_mode == "online"
+
+#- name: Install Pypi
+#  easy_install: name=pip state=latest
+#  when: 
+#    - install_mode == "online"
+
+- name : Install Pypi
+  apt: pkg=python-pip
+  when:
+    - install_mode == "online"
+
+- name: Install docker-py module.
+  shell: /usr/bin/pip install --ignore-installed docker-py
+  when: 
+    - install_mode == "online"
+
+#- name: Install docker container engine package
+#  yum: name=docker state=latest
+
+#- name: Put /etc/sysconfig/docker file.
+#  template: src=docker.j2 dest=/etc/sysconfig/docker 
+
+#- name: Start and Enable Docker
+#  service: name=docker state=started enabled=yes
+
+
+- name: Install apt-transport-https
+  apt: pkg=apt-transport-https state=latest
+  when: 
+    - install_mode == "online"
+
+- name: Install ca-certificates
+  apt: pkg=ca-certificates state=latest
+  when: 
+    - install_mode == "online"
+
+- name: Install curl
+  apt: pkg=curl state=latest
+  when: 
+    - install_mode == "online"
+
+- name: Install gnupg2
+  apt: pkg=gnupg2 state=latest
+  when:
+    - install_mode == "online"
+
+- name: Install software-properties-common
+  apt: pkg=software-properties-common state=latest
+  when:
+    - install_mode == "online"
+
+- name: Add Docker key
+  apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+  become: yes
+  when: 
+    - install_mode == "online"
+
+- name: create repo line
+  #  command: bash -c "echo \"deb [arch=amd64] https://download.docker.com/linux/ubuntu bionic stable \" "
+  #  register: docker_repo_line
+  template:
+     src: download_docker_com_linux_ubuntu.list
+     dest: /etc/apt/sources.list.d/download_docker_com_linux_ubuntu.list
+  when:
+    - install_mode == "online"
+
+- name: apt update
+  apt: update_cache=yes
+  when:
+    - install_mode == "online"
+
+  #- name: add docker repo
+  #apt_repository:
+  #  repo: "{{ docker_apt_repository }}"
+  #  state: present
+  #  update_cache: yes
+  #become: yes
+
+#- name: Install Docker
+#  package:
+#    name: docker-ce-{{ docker_version }}
+#    state: installed
+#  become: yes
+
+- name: Install Docker
+  apt: pkg=docker-ce=17.03.2~ce-0~ubuntu-xenial
+  when: 
+    - install_mode == "online"
+  become: yes
+
+- name: Start Docker service
+  service:
+    name: docker
+    state: started
+    enabled: yes
+  become: yes
+
+  #- name: sources.list.d delete
+  #command: bash -c "rm -rf /etc/apt/sources.list.d/download_docker_com_linux_ubuntu.list"
+

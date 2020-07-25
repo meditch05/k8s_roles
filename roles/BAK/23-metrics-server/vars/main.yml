@@ -1,0 +1,9 @@
+---
+# User user namespace for influxdb server
+namespace: kube-system
+# Decide the size of Storage(Gi)
+storage: "{{ influxdb_storage }}"
+# FIXME: use the right IP
+server: "{{ master_ip }}"
+path: "{{ accordion_nfs_path }}/influxdb"
+nodePort: 30003

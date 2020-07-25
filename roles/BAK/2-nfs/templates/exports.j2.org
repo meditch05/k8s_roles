@@ -1,0 +1,3 @@
+{% for host in groups['minions'] %}
+{{ accordion_nfs_path }} {{ hostvars[host]['ansible_host'] }}(rw,sync,fsid=0,no_root_squash)
+{% endfor %}

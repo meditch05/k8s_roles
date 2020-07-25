@@ -1,0 +1,12 @@
+apiVersion: v1
+data:
+  enable-sticky-sessions: "true"
+  client-max-body-size: "500m"
+  proxy-body-size: "500m"
+  proxy_send_timeout: "300"
+  proxy-read-timeout: "300"
+  enable-vts-status: "true"
+  keep-alive: "5"
+kind: ConfigMap
+metadata:
+  name: nginx-load-balancer-conf

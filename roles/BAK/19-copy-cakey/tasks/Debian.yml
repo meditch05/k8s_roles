@@ -1,0 +1,52 @@
+---
+- name: stat kubernetes config directory
+  stat: path=/etc/kubernetes
+  register: kub_stat
+  ignore_errors: True
+
+- name: mv kubernetes
+  command: 'mv /etc/kubernetes /etc/kubernetes.org'
+  when: kub_stat.stat.exists
+  ignore_errors: True
+
+- name: stat kubelet pki directory
+  stat: path=/var/lib/kubelet/pki
+  register: kublet_stat
+  ignore_errors: True
+
+- name: mv pki
+  command: 'mv /var/lib/kubelet/pki /var/lib/kubelet/pki.org'
+  when: kublet_stat.stat.exists
+  ignore_errors: True
+
+- name: Copy /etc/kubernetes
+  synchronize:
+    src: /etc/kubernetes
+    dest: /etc
+  delegate_to: "{{ groups['master'][0] }}"
+  ignore_errors: True
+
+- name: Copy /var/lib/kubelet/pki
+  synchronize:
+    src: /var/lib/kubelet/pki
+    dest: /var/lib/kubelet
+  delegate_to: "{{ groups['master'][0] }}"
+  ignore_errors: True
+
+- name: Copy /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+  synchronize:
+    src: /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+    dest: /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+  delegate_to: "{{ groups['master'][0] }}"
+  ignore_errors: True
+
+- name: Copy /etc/kubernetes/config 
+  synchronize:
+    src: /root/.kube/config
+    dest: /root/.kube/config
+  delegate_to: "{{ groups['master'][0] }}"
+  ignore_errors: True
+
+- name: just force systemd to reread configs
+  command: systemctl daemon-reload
+  ignore_errors: True

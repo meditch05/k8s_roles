@@ -1,0 +1,28 @@
+skt-elkpap01 ansible_host=150.149.49.43 ansible_connection=local node_role=infra
+skt-infmon01 ansible_host=150.149.49.83 ansible_connection=ssh   node_role=infra ansible_ssh_user=root
+skt-elkpap02 ansible_host=150.149.49.44 ansible_connection=ssh   node_role=infra ansible_ssh_user=root
+skt-elkpap03 ansible_host=150.149.49.45 ansible_connection=ssh   node_role=infra ansible_ssh_user=root
+
+[master]
+skt-elkpap01
+
+[master-cluster]
+
+[minions]
+skt-infmon01
+skt-elkpap02
+skt-elkpap03
+
+[managements]
+skt-infmon01
+
+[all]
+skt-elkpap01
+skt-infmon01
+skt-elkpap02
+skt-elkpap03
+
+[backup-master]
+
+[infra]
+

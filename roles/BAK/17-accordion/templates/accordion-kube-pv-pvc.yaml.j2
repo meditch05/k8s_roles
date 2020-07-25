@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: accordion-kube-pv
+  labels:
+   volume-task: accordion-kube
+  annotations:
+   # pv.beta.kubernetes.io/gid: "1001001"
+spec:
+  capacity:
+    storage: 10Mi
+  accessModes:
+    - ReadWriteMany
+  nfs:
+    server: {{ server }} 
+    path: {{ kubepath }} 
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: accordion-kube-pvc
+  namespace: accordion
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Mi
+  selector:
+    matchLabels:
+      volume-task: accordion-kube

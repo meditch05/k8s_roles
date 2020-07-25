@@ -1,0 +1,32 @@
+---
+- name: Install dockers and rpms to all hosts
+  hosts: '{{ TARGET }}'
+
+  roles:
+    - { role: 0-rpms-install, when: install_mode == "offline" }
+
+- name: Apply common configuration to all hosts
+  hosts: '{{ TARGET }}'
+
+  roles:
+    - 1-add-uid-gid
+    - 3-kube-prerequisite
+
+- name: Install docker, kubelet, kubectl, kubeadm, kube-cni
+  hosts: '{{ TARGET }}'
+
+  roles:
+    - 4-docker-install
+    - 5-kube-install
+
+- name: kubeadm init & join
+  hosts: '{{ TARGET }}'
+
+  roles:
+    - 20-add-node
+
+- name: Setup Node Taints
+  hosts: '{{ TARGET }}'
+  roles:
+    - 7-node-label
+

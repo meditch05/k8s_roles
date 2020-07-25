@@ -1,0 +1,74 @@
+---
+- name: Teardown kube nodes
+  shell: >
+    kubeadm reset
+  ignore_errors: True
+  when:
+    - kubernetes_version | search('1.9')
+
+- name: Teardown kube nodes
+  shell: >
+    kubeadm reset
+  ignore_errors: True
+  when:
+    - kubernetes_version | search('1.10')
+
+- name: Teardown kube nodes
+  shell: >
+    kubeadm reset -f
+  ignore_errors: True
+  when:
+    - kubernetes_version | search('1.11') or kubernetes_version | search('1.12')
+
+- name: Remove all semaphores
+  file:
+    dest: "{{ item }}"
+    state: absent
+  with_items:
+    - "/etc/.kubeadm-complete"
+#    - "{{ kubectl_home }}/.kubeadm-podnetwork-complete"
+    - "/etc/.kubeadm-joined"
+#    - "{{ kubectl_home }}/admin.conf"
+  ignore_errors: True
+
+- name: Remove nfs-utils
+  apt: name=nfs-utils state=absent
+  ignore_errors: True
+
+- name: Remove kubectl
+  apt: name=kubectl-{{ kubernetes_version }}-0.x86_64 state=absent
+  ignore_errors: True
+
+- name: Remove kubelet
+  apt: name=kubelet-{{ kubernetes_version }}-0.x86_64 state=absent
+  ignore_errors: True
+
+- name: Remove kubeadm
+  apt: name=kubeadm-{{ kubernetes_version }}-0.x86_64 state=absent
+  ignore_errors: True
+
+- name: Remove kubernetes-cni
+  apt: name=kubernetes-cnt-{{ kubernetes_version }}-0.x86_64 state=absent
+  ignore_errors: True
+
+- name: Remove alias
+  shell: >
+    sed -i '/kubectl/d' /root/.bashrc
+
+- name: source bashrc
+  shell: source ~/.bashrc
+  args:
+    executable: /bin/bash
+
+- name: remove docker
+  apt:
+    name: "{{ item }}"
+    state: absent
+  with_items:
+    - docker
+    - docker-common
+    - docker-selinux
+    - docker-engine
+    - container-selinux
+    - docker-ce
+  ignore_errors: True

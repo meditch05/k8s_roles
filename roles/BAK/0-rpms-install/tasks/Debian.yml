@@ -1,0 +1,71 @@
+---
+- name: Copy dockers
+  synchronize:
+    src: "{{ ubuntu_docker_path }}"
+    dest: /tmp
+  when: inventory_hostname in groups['minions'] or inventory_hostname in groups['infra'] or inventory_hostname in groups['backup-master']
+
+- name: Copy dpkg
+  synchronize:
+    src: "{{ dpkg_path }}"
+    dest: /tmp
+  when: inventory_hostname in groups['minions'] or inventory_hostname in groups['infra'] or inventory_hostname in groups['backup-master']
+
+- name: "Mode 755 for run.sh (nodes)"
+  file:
+    path: "/tmp/dpkg/run.sh"
+    mode: 0755
+  when: inventory_hostname in groups['minions'] or inventory_hostname in groups['infra'] or inventory_hostname in groups['backup-master']
+
+- name: Run dpkg-install (nodes)
+  shell: >
+    /bin/bash -c "/tmp/dpkg/run.sh"
+  args:
+    chdir: "/tmp/dpkg/"
+  when: inventory_hostname in groups['minions'] or inventory_hostname in groups['infra'] or inventory_hostname in groups['backup-master']
+
+- name: "Mode 755 for run.sh (master)"
+  file:
+    path: "{{ dpkg_path }}/run.sh"
+    mode: 0755
+  when: inventory_hostname in groups['master']
+
+- name: Run dpkg-install (master)
+  shell: >
+    /bin/bash -c "{{ dpkg_path }}/run.sh"
+  args:
+    chdir: "{{ dpkg_path }}"
+  when: inventory_hostname in groups['master']
+
+- name: Start Docker service
+  service:
+    name: docker
+    state: started
+    enabled: yes
+  become: yes
+
+  #- name: "Mode 755 for docker_load.sh (master)"
+  #  file:
+  #    path: "{{ ubuntu_docker_path }}/docker_load.sh"
+  #    mode: 0755
+  #  when: inventory_hostname in groups['master']
+
+  #- name: Run docker-install (master)
+  #  shell: >
+  #    /bin/sh -c "{{ ubuntu_docker_path }}/docker_load.sh"
+  #  args:
+  #    chdir: "{{ ubuntu_docker_path }}"
+  #  when: inventory_hostname in groups['master']
+    
+  #- name: "Mode 755 for docker_load.sh"
+  #  file:
+  #    path: "/tmp/docker/docker_load.sh"
+  #    mode: 0755
+  #  when: inventory_hostname in groups['minions'] or inventory_hostname in groups['infra'] or inventory_hostname in groups['backup-master']
+
+  #- name: Run docker-install (nodes)
+  #  shell: >
+  #    /bin/sh -c "/tmp/docker/docker_load.sh"
+  #  args:
+  #    chdir: "/tmp/docker"
+  #  when: inventory_hostname in groups['minions'] or inventory_hostname in groups['infra'] or inventory_hostname in groups['backup-master']

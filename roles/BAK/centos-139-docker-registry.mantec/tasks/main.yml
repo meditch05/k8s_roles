@@ -1,0 +1,276 @@
+---
+- name: Make a docker cert directory
+  file: path={{ docker_cert_path }} state=directory
+  when: inventory_hostname in groups['master']
+  ignore_errors: yes
+
+- name: Make a docker registry directory
+  file: path={{ docker_registry_path }} state=directory
+  when: inventory_hostname in groups['master']
+  ignore_errors: yes
+
+- name: Make a addon directory
+  file: path={{ kube_addon_dir }}/registry state=directory
+  when: inventory_hostname in groups['master']
+  ignore_errors: yes
+
+- name: Create the private key
+  shell: >
+    openssl req -x509 -nodes -days 7300 -newkey rsa:2048 -keyout {{ docker_cert_path }}/tls.key -out {{ docker_cert_path }}/tls.crt -subj "/CN={{ docker_registry_domain }}" 
+#    openssl req -x509 -nodes -days 7300 -newkey rsa:2048 -keyout {{ docker_cert_path }}/tls.key -out {{ docker_cert_path }}/tls.crt -subj "/CN={{ master_ip }}"
+#    => only login at vm-master1 with 127.0.0.1 ( not 192.168.56.113 and myregistry.mwportal.com )
+  when: inventory_hostname in groups['master']
+
+- name: Create the secret
+  shell: >
+    kubectl --namespace={{ docker_namespace }} create secret generic registry-secret --from-file=domain.crt={{ docker_cert_path }}/tls.crt --from-file=domain.key={{ docker_cert_path }}/tls.key
+  ignore_errors: yes
+  when: inventory_hostname in groups['master']
+
+- name: Create the htpasswd
+  shell: >
+    docker run --entrypoint htpasswd registry:2 -Bbn webwas alskfl12~!
+  register: htpasswd
+  when: inventory_hostname in groups['master']
+
+- name: Print output of htpasswd
+  debug: msg="{{ htpasswd.stdout_lines }}"
+  tags:
+    - output
+  when: inventory_hostname in groups['master']
+
+- name: Copy the htpasswd
+  shell: >
+    echo -e '{{ htpasswd.stdout }}' > {{ docker_registry_path }}/htpasswd
+  when: inventory_hostname in groups['master']
+    
+- name: Register the htpasswd
+  shell: >
+     kubectl create secret generic basic-auth --from-file={{ docker_registry_path }}/htpasswd --namespace={{ docker_namespace }}
+  ignore_errors: yes
+  when: inventory_hostname in groups['master']
+
+######### PV #####################################################################
+- name: Put {{ kube_addon_dir }}/registry/registry-pv.yaml file
+  template:
+     src: registry-pv.yaml.j2
+     dest: "{{ kube_addon_dir }}/registry/registry-pv.yaml"
+  when: inventory_hostname in groups['master']
+
+- name: Create a PV(Persistent Volume) for registry
+  shell: >
+    kubectl create -f {{ kube_addon_dir }}/registry/registry-pv.yaml
+  ignore_errors: yes
+  when: inventory_hostname in groups['master']
+
+######### PVC ####################################################################
+- name: Copy {{ kube_addon_dir }}/registry/registry-pvc.yaml file
+  template:
+    src: registry-pvc.yaml.j2
+    dest: "{{ kube_addon_dir }}/registry/registry-pvc.yaml"
+  when: inventory_hostname in groups['master']
+
+- name: Create a PVC(Persistent Volume Claim) for registry
+  shell: >
+    kubectl create -f {{ kube_addon_dir }}/registry/registry-pvc.yaml
+  ignore_errors: yes
+  when: inventory_hostname in groups['master']
+
+######### svc #############################################################
+- name: Copy {{ kube_addon_dir }}/registry/registry-svc.yaml file
+  template:
+    src: registry-svc.yaml.j2
+    dest: "{{ kube_addon_dir }}/registry/registry-svc.yaml"
+  when: inventory_hostname in groups['master']
+
+- name: Create a service for the private docker registry
+  shell: >
+    kubectl create -f {{ kube_addon_dir }}/registry/registry-svc.yaml
+  ignore_errors: yes
+  when: inventory_hostname in groups['master']
+
+######### sleep 20 #############################################################
+- name: wait for PV and PVC bound
+  shell: >
+    sleep 20
+  when: inventory_hostname in groups['master']
+
+######### rc #############################################################
+- name: Copy {{ kube_addon_dir }}/registry/registry-rc.yaml file
+  template:
+    src: registry-rc.yaml.j2
+    dest: "{{ kube_addon_dir }}/registry/registry-rc.yaml"
+  when: inventory_hostname in groups['master']
+
+- name: Deploy a private docker registry
+  shell: >
+    kubectl create -f {{ kube_addon_dir }}/registry/registry-rc.yaml
+  ignore_errors: yes
+  when: inventory_hostname in groups['master']
+
+######### /etc/hosts, /etc/docker/daemon.json ############################
+- name: update /etc/hosts file ( myregistry.mwportal.com )
+  copy:
+    src: hosts
+    dest: /etc/hosts
+  when:
+    - inventory_hostname in groups['all']
+
+- name: Create /etc/docker/daemon.json ( for using docker registry at remote )
+  template:
+     src: daemon.json.j2
+     dest: "/etc/docker/daemon.json"
+  when:
+    - inventory_hostname in groups['all']
+
+######### Result #################################################################
+- name: list kubernetes' pods
+  shell: >
+    kubectl get pods --all-namespaces
+  changed_when: false
+  register: kubectl_get_pods
+  tags:
+    - output
+  when: inventory_hostname in groups['master']
+
+- name: print output of `kubectl get pods --all-namespaces`
+  debug: msg="{{ kubectl_get_pods.stdout_lines }}"
+  tags:
+    - output
+  when: inventory_hostname in groups['master']
+
+######### registry user #################################################################
+- name: Create docker registry user-id
+  shell: >
+    kubectl create secret docker-registry regsecret --docker-server={{ master_ip }}:{{ docker_registry_nodeport }} --docker-username=webwas --docker-password=alskfl12~! -n infra
+  when: inventory_hostname in groups['master']
+    
+# END
+
+
+# ######### Deploy-svc #############################################################
+# - name: Copy {{ kube_addon_dir }}/registry/registry-deploy-svc.yaml file
+#   copy:
+#     src: registry-deploy-svc.yaml
+#     dest: "{{ kube_addon_dir }}/registry/registry-deploy-svc.yaml"
+#   # when: inventory_hostname in groups['master']
+
+# - name: Deploy a private docker registry
+#   shell: >
+#     kubectl create -f {{ kube_addon_dir }}/registry/registry-deploy-svc.yaml
+#   # ignore_errors: yes
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ##################################################################################
+# # Docker private registry using NFS
+# ##################################################################################
+# - name: Registry directory
+#   file: path={{ path }} state=directory mode=0777
+#   register: registry_dir
+#   ignore_errors: yes
+
+# - name: Registry addon directory
+#   file: path={{ kube_addon_dir }}/registry state=directory mode=0777
+#   register: registry_addon_dir
+#   ignore_errors: yes
+
+# ######### PV #####################################################################
+# - name: Put {{ kube_addon_dir }}/registry/registry-pv.yaml file
+#   template:
+#     src: registry-pv.yaml.j2
+#     dest: "{{ kube_addon_dir }}/registry/registry-pv.yaml"
+#   # when: inventory_hostname in groups['master']
+
+# - name: Create a PV(Persistent Volume) for registry
+#   shell: >
+#     kubectl create -f {{ kube_addon_dir }}/registry/registry-pv.yaml
+#   # ignore_errors: yes
+
+# ######### PVC ####################################################################
+# - name: Put {{ kube_addon_dir }}/registry/registry-pvc.yaml file
+#   template:
+#     src: registry-pvc.yaml.j2
+#     dest: "{{ kube_addon_dir }}/registry/registry-pvc.yaml"
+#   # when: inventory_hostname in groups['master']
+
+# - name: Create a PVC(Persistent Volume Claim) for registry
+#   shell: >
+#     kubectl create -f {{ kube_addon_dir }}/registry/registry-pvc.yaml
+#   # ignore_errors: yes
+
+# ######### Service ################################################################
+# - name: Put {{ kube_addon_dir }}/registry/registry-svc.yaml file
+#   template:
+#     src: registry-svc.yaml.j2
+#     dest: "{{ kube_addon_dir }}/registry/registry-svc.yaml"
+#   # when: inventory_hostname in groups['master']
+
+# - name: Create a service for registry
+#   shell: >
+#     kubectl create -f {{ kube_addon_dir }}/registry/registry-svc.yaml
+#   # ignore_errors: yes
+
+# ######### Deployment #############################################################
+# - name: Put {{ kube_addon_dir }}/registry/registry-deploy.yaml file
+#   template:
+#     src: registry-deploy.yaml.j2
+#     dest: "{{ kube_addon_dir }}/registry/registry-deploy.yaml"
+#   # when: inventory_hostname in groups['master']
+
+# - name: Deploy a private docker registry
+#   shell: >
+#     kubectl create -f {{ kube_addon_dir }}/registry/registry-deploy.yaml
+#   # ignore_errors: yes
+
+# ######### Result #################################################################
+# - name: list kubernetes' pods
+#   shell: >
+#     kubectl get pods --all-namespaces
+#   changed_when: false
+#   register: kubectl_get_pods
+#   tags:
+#     - output
+
+# - name: print output of `kubectl get pods --all-namespaces`
+#   debug: msg="{{ kubectl_get_pods.stdout_lines }}"
+#   tags:
+#     - output
+
+###################################################################
+# Another way
+###################################################################
+# - name: Create a directory for registry volume. 
+#   file: path=/srv/docker/images state=directory mode=0755
+
+# #  Disable selinux on common/task/main.yml
+# #- name: chcon on /srv/docker/images for container to write in.
+# #  shell: chcon -Rt svirt_sandbox_file_t /srv/docker/images
+
+# - name: Run a private docker registry - D'Artagnan
+#   docker_container:
+#     name: dartagnan
+#     state: started
+#     image: registry:2
+#     ports:
+#       - "{{ registry_ip }}:{{ registry_port }}:5000/tcp"
+#     volumes:
+#       - /srv/docker/images:/var/lib/registry:rw
+
+

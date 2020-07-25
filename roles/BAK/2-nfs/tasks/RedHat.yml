@@ -1,0 +1,75 @@
+---
+####### Configure NFS for all the nodes ##########################################
+- name: Stop the firewall
+  service: name=firewalld state=stopped enabled=no
+  ignore_errors: yes
+
+#- name: Stop selinux
+#  command: 'setenforce 0'
+#  ignore_errors: yes
+
+#- name: Disabled selinux
+#  selinux: state=disabled
+  
+- selinux:
+    policy: targeted
+    state: permissive
+
+- name: Install nfs-utils
+  yum: name=nfs-utils state=latest
+  when: 
+    - install_mode == "online"
+
+- name: Install rsync
+  yum: name=rsync state=latest
+  when:
+    - install_mode == "online"
+
+- name: Creates nfs directory
+  file: path={{ accordion_nfs_path }} state=directory
+  when: inventory_hostname in groups['master'] or
+        inventory_hostname in groups['backup-master']
+
+########################################################################
+### Configure NFS for the master 
+########################################################################
+#- name: Creates data directory
+#  file: path={{ accordion_nfs_path }} state=directory mode=0777
+#  when: inventory_hostname in groups['master'] or
+#        inventory_hostname in groups['backup-master']
+#
+#- name: Change owner of nfs path
+#  shell: >
+#    chown accordion:accordion {{ accordion_nfs_path }}
+#  when: inventory_hostname in groups['master'] or
+#        inventory_hostname in groups['backup-master']
+#    
+## ex: echo -e "/nfs/data 192.168.132.133(rw,sync,fsid=0,no_root_squash)" >> /etc/exports
+#- name: Configure nfs
+#  template: src=exports.j2 dest=/etc/exports
+#  when: inventory_hostname in groups['master'] or
+#        inventory_hostname in groups['backup-master']
+#
+#- name: Enable and start nfs server
+#  service: name=nfs-server state=started enabled=yes
+#  when: inventory_hostname in groups['master'] or
+#        inventory_hostname in groups['backup-master']
+#
+#- name: Exportfs
+#  command: 'exportfs -a'
+#  when: inventory_hostname in groups['master'] or
+#        inventory_hostname in groups['backup-master']
+#
+#- name: Configure nfs service 
+#  shell: >
+#    sed -i 's#Before= rpc-statd-notify.service#Before= rpc-statd-notify.service docker.service kubelet.service#g' /usr/lib/systemd/system/nfs-server.service
+#  when: inventory_hostname in groups['master'] or
+#        inventory_hostname in groups['backup-master']
+#
+#- name: daemon-reload
+#  command: systemctl daemon-reload
+#
+#- name: Restart nfs server
+#  service: name=nfs-server state=restarted
+#  when: inventory_hostname in groups['master'] or
+#        inventory_hostname in groups['backup-master']

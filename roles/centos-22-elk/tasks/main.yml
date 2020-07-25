@@ -1,0 +1,84 @@
+---
+##################################################################################
+# Elasticsearch Install
+##################################################################################
+- name: Add helm Repository
+  shell: >
+    helm repo add elastic https://helm.elastic.co
+  when: inventory_hostname in groups['master']
+
+- name: Create elasticsearch addon directory
+  file: path={{ kube_addon_dir }}/elasticsearch state=directory
+  ignore_errors: true
+
+- name: Copy values.yaml.elasticsearch file
+  copy:
+    src: values.yaml.elasticsearch
+    dest: "{{ kube_addon_dir }}/elasticsearch/values.yaml.elasticsearch"
+  ignore_errors: yes
+
+- name: Install elasticsearch ( w/helm )
+  shell: >
+    helm install --name elasticsearch --namespace {{ elasticsearch_namespace }} -f {{ kube_addon_dir }}/elasticsearch/values.yaml.elasticsearch elastic/elasticsearch
+  when: inventory_hostname in groups['master']
+
+- name: sleep 30
+  shell: >
+    sleep 30
+  when: inventory_hostname in groups['master']
+
+##################################################################################
+# Kibana Install
+##################################################################################
+- name: Copy values.yaml.kibana file
+  copy:
+    src: values.yaml.kibana
+    dest: "{{ kube_addon_dir }}/elasticsearch/values.yaml.kibana"
+  ignore_errors: yes
+
+- name: Install kibana ( w/helm )
+  shell: >
+    helm install --name kibana --namespace {{ elasticsearch_namespace }} -f {{ kube_addon_dir }}/elasticsearch/values.yaml.kibana elastic/kibana
+  when: inventory_hostname in groups['master']
+
+##################################################################################
+# Filebeat Install ( 2018-05-28. elastic/filebeat daemonset.yaml Error Correct )
+##################################################################################
+- name: Copy values.yaml.filebeat file
+  copy:
+    src: values.yaml.filebeat
+    dest: "{{ kube_addon_dir }}/elasticsearch/filebeat/values.yaml.filebeat"
+  ignore_errors: yes
+
+- name: Install filebeat ( w/helm )
+  shell: >
+    helm install --name filebeat --namespace {{ elasticsearch_namespace }} -f {{ kube_addon_dir }}/elasticsearch/values.yaml.filebeat elastic/filebeat
+  when: inventory_hostname in groups['master']
+
+##################################################################################
+# Logstash Install ( stable/logstash )
+##################################################################################
+- name: Copy values.yaml.logstash file
+  copy:
+    src: logstash.deployment.yml
+    dest: "{{ kube_addon_dir }}/elasticsearch/logstash.deployment.yml"
+  ignore_errors: yes
+
+- name: Install logstash ( w/helm )
+  shell: >
+    kubectl apply -f {{ kube_addon_dir }}/elasticsearch/logstash.deployment.yml
+  when: inventory_hostname in groups['master']
+  
+######### Result #################################################################
+- name: list kubernetes pods
+  shell: >
+    kubectl get all -n {{ elasticsearch_namespace }}
+  changed_when: false
+  register: kubectl_get_all
+  tags:
+    - output
+
+- name: print output of "kubectl get all -n {{ elasticsearch_namespace }}"
+  debug: msg="{{ kubectl_get_all.stdout_lines }}"
+  tags:
+    - output

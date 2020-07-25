@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-nodeport-0
+  namespace: kafka
+spec:
+  type: NodePort
+  ports:
+    - name: http
+      protocol: TCP
+      targetPort: 9092
+      port: 9092        # ClusterPORT with ClusterIP
+      nodePort: 31090
+  selector:
+    app: kafka
+    release: kafka
+    statefulset.kubernetes.io/pod-name: kafka-0
+  sessionAffinity: None

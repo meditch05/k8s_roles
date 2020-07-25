@@ -1,0 +1,52 @@
+---
+##################################################################################
+# Jenkins for Kubernetes
+##################################################################################
+- name: Make a jenkins directory
+  file: path={{ kube_addon_dir }}/jenkins state=directory
+  when: inventory_hostname in groups['master']
+  ignore_errors: yes
+
+#- name: Create values.yaml
+#  shell: >
+#    helm inspect values stable/jenkins > {{ kube_addon_dir }}/jenkins/values.jenkins.yaml.ori
+#  ignore_errors: yes
+#  when: inventory_hostname in groups['master']
+
+- name: Copy values.jenkins.yaml
+  copy:
+    src: values.jenkins.yaml
+    dest: "{{ kube_addon_dir }}/jenkins/values.jenkins.yaml"
+  when: inventory_hostname in groups['master']
+
+######### Helm Install # #########################################################
+- name: Install jenkins ( w/helm )
+  shell: >
+    helm install --name jenkins --namespace {{ jenkins_namespace }} -f {{ kube_addon_dir }}/jenkins/values.jenkins.yaml stable/jenkins 
+  ignore_errors: yes
+  when: inventory_hostname in groups['master']
+
+######### Result #################################################################
+- name: list kubernetes pods
+  shell: >
+    kubectl get all -n {{ jenkins_namespace }}
+  changed_when: false
+  register: kubectl_get_all
+  tags:
+    - output
+
+- name: print output of "kubectl get all -n {{ jenkins_namespace }}"
+  debug: msg="{{ kubectl_get_all.stdout_lines }}"
+  tags:
+    - output
+
+######### ClusterRoleBiding for jenkins-slave ####################################
+- name: Copy ClusterRoleBinding.jenkins-schedule-agents.cluster-admin.yml
+  copy:
+    src: values.jenkins.yaml
+    dest: "{{ kube_addon_dir }}/jenkins/ClusterRoleBinding.jenkins-schedule-agents.cluster-admin.yml"
+  when: inventory_hostname in groups['master']
+
+- name: Apply cluster-admin ClusterRoleBinding sa/jenkins -n infra
+  shell: kubectl apply -f {{ kube_addon_dir }}/jenkins/ClusterRoleBinding.jenkins-schedule-agents.cluster-admin.yml
+  when: inventory_hostname in groups['master']

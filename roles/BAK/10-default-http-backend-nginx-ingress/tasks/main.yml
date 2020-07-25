@@ -1,0 +1,51 @@
+---
+##################################################################################
+# Default http backend
+# Nginx Ingress Controller
+##################################################################################
+- name: default addon directory
+  file: path={{ kube_addon_dir }}/default state=directory
+  register: default_addon_dir
+  ignore_errors: True
+
+- name: Copy sticky-session.yaml file
+  copy:
+    src: sticky-session.yaml
+    dest: "{{ kube_addon_dir }}/default/sticky-session.yaml"
+
+- name: Deploy sticky-session.yaml
+  shell: >
+    kubectl create -f {{ kube_addon_dir }}/default/sticky-session.yaml -n kube-system
+
+
+- name: Copy rbac.yaml file
+  copy:
+    src: rbac.yaml
+    dest: "{{ kube_addon_dir }}/default/rbac.yaml"
+
+- name: Deploy rbac.yaml
+  shell: >
+    kubectl create -f {{ kube_addon_dir }}/default/rbac.yaml -n kube-system
+
+- name: Copy defautl-http-backend-nginx-ingress-controller.yaml file
+  template:
+    src: defautl-http-backend-nginx-ingress-controller.yaml.j2
+    dest: "{{ kube_addon_dir }}/default/defautl-http-backend-nginx-ingress-controller.yaml"
+
+- name: Deploy defautl-http-backend-nginx-ingress-controller.yaml
+  shell: >
+    kubectl apply -f {{ kube_addon_dir }}/default/defautl-http-backend-nginx-ingress-controller.yaml -n kube-system
+
+######### Result #################################
+- name: list kubernetes' pods
+  shell: >
+    kubectl get pods --all-namespaces
+  changed_when: false
+  register: kubectl_get_pods
+  tags:
+    - output
+
+- name: print output of `kubectl get pods --all-namespaces`
+  debug: msg="{{ kubectl_get_pods.stdout_lines }}"
+  tags:
+    - output

@@ -1,0 +1,6 @@
+{% for host in groups['all'] %}
+{{ accordion_nfs_path }} {{ hostvars[host]['ansible_host'] }}(rw,sync,fsid=0,no_root_squash)
+{% endfor %}
+{% if loadbalancer_apiserver == 'true' %}
+{{ accordion_nfs_path }} {{ apiserver_loadbalancer_vip }}(rw,sync,fsid=0,no_root_squash)
+{% endif %}

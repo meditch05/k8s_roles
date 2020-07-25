@@ -1,0 +1,33 @@
+---
+##################################################################################
+# Kubernetes Dashboard
+##################################################################################
+- name: create kubernetes addon directory
+  file: path={{ kube_addon_dir }}/dashboard state=directory
+  register: addon_dir
+  ignore_errors: True
+
+- name: Put {{ kube_addon_dir }}/dashboard/dashboard.yaml file
+  template:
+    src: dashboard.yaml.j2
+    dest: "{{ kube_addon_dir }}/dashboard/dashboard.yaml"
+  # when: inventory_hostname in groups['master']
+
+- name: Deploy the Dashboard
+  shell: >
+    kubectl create -f {{ kube_addon_dir }}/dashboard/dashboard.yaml
+  ignore_errors: True
+
+######### Result #################################
+- name: list kubernetes' pods
+  shell: >
+    kubectl get pods --all-namespaces
+  changed_when: false
+  register: kubectl_get_pods
+  tags:
+    - output
+
+- name: print output of `kubectl get pods --all-namespaces`
+  debug: msg="{{ kubectl_get_pods.stdout_lines }}"
+  tags:
+    - output

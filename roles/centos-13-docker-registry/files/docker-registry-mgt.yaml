@@ -1,0 +1,70 @@
+---
+apiVersion: extensions/v1beta1 
+kind: Deployment 
+metadata: 
+  name: docker-registry-web
+  namespace: infra
+  labels:
+    app: docker-registry-web
+spec: 
+  replicas: 1 
+  template: 
+    metadata: 
+      labels: 
+        app: docker-registry-web
+    spec: 
+      containers: 
+      - image: hyper/docker-registry-web
+        imagePullPolicy: Always 
+        name: docker-registry-web
+        env:
+        - name: REGISTRY_URL
+          value: "http://docker-registry.infra.svc.cluster.local:5000/v2"
+        - name: REGISTRY_TRUST_ANY_SSL
+          value: "false"
+        #- name: REGISTRY_BASIC_AUTH
+        #  value: "http://myregistry.mwportal.com:30001/v2"
+        - name: REGISTRY_NAME
+          value: "docker-registry.infra.svc.cluster.local:5000"
+        ports: 
+        - containerPort: 8080 
+          name: http 
+          protocol: TCP 
+      nodeSelector: 
+        node-role.kubernetes.io/management: "true"
+---
+apiVersion: v1 
+kind: Service 
+metadata: 
+  name: docker-registry-web
+  namespace: infra
+spec: 
+  selector: 
+    app: docker-registry-web
+  type: ClusterIP 
+  ports: 
+    - name: http 
+      port: 8080 
+      protocol: TCP 
+      targetPort: 8080 
+--- 
+apiVersion: extensions/v1beta1 
+kind: Ingress 
+metadata: 
+  name: docker-registry-web
+  namespace: infra
+  labels: 
+    app.kubernetes.io/name: "docker-registry-web"
+  annotations: 
+    ingress.kubernetes.io/ssl-redirect: "false" 
+    kubernetes.io/ingress.class: "nginx" 
+    ingress.kubernetes.io/rewrite-target: / 
+spec: 
+  rules: 
+  - host: registry-mgt.mwportal.com 
+    http: 
+      paths: 
+      - path: / 
+        backend: 
+          serviceName: docker-registry-web
+          servicePort: 8080 

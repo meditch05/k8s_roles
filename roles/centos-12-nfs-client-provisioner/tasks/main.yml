@@ -1,0 +1,44 @@
+---
+##################################################################################
+# NFS client Provisioner
+##################################################################################
+##################################################################
+# Pre Check - 192.168.56.241 /nfs_provisioner 
+#################################################################
+- name: Make a provisioner directory
+  file: path={{ kube_addon_dir }}/nfs-provisioner state=directory
+  when: inventory_hostname in groups['master']
+  ignore_errors: yes
+
+#- name: Create values.yaml
+#  shell: >
+#    helm inspect values stable/nfs-client-provisioner > values.nfs-provisioner.yaml.ori
+#  ignore_errors: yes
+#  when: inventory_hostname in groups['master']
+
+- name: Copy values.nfs-provisioner.yaml
+  copy:
+    src: values.nfs-provisioner.yaml
+    dest: "{{ kube_addon_dir }}/nfs-provisioner/values.nfs-provisioner.yaml"
+  when: inventory_hostname in groups['master']
+
+######### Helm Install # #########################################################
+- name: Install nfs-client-provisioner ( w/helm )
+  shell: >
+    helm install --name nfs-client-provisioner --namespace {{ provisioner_namespace }} -f {{ kube_addon_dir }}/nfs-provisioner/values.nfs-provisioner.yaml stable/nfs-client-provisioner 
+  ignore_errors: yes
+  when: inventory_hostname in groups['master']
+
+######### Result #################################################################
+- name: list kubernetes pods
+  shell: >
+    kubectl get all -n {{ provisioner_namespace }}
+  changed_when: false
+  register: kubectl_get_all
+  tags:
+    - output
+
+- name: print output of "kubectl get all -n {{ provisioner_namespace }}"
+  debug: msg="{{ kubectl_get_all.stdout_lines }}"
+  tags:
+    - output

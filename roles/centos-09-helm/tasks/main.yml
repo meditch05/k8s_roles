@@ -1,0 +1,42 @@
+---
+##################################################################################
+# Install Helm and Tiller
+##################################################################################
+- name: Helm addon directory
+  file: path={{ kube_addon_dir }}/helm state=directory
+  ignore_errors: true
+
+- name: Get Helm install script
+  copy:
+    src: install_helm.sh
+    dest: "{{ kube_addon_dir }}/helm/install_helm.sh"
+  #  curl https://raw.githubusercontent.com/helm/helm/master/scripts/get > install_helm.sh
+
+- name: Mode 755 for install_helm.sh
+  file:
+    path: "{{ kube_addon_dir }}/helm/install_helm.sh"
+    mode: 0755
+
+- name: Run install_helm.sh
+  shell: >
+    /bin/sh -c "{{ kube_addon_dir }}/helm/install_helm.sh"
+
+- name: Create ServiceAccount/tiller
+  shell: >
+    kubectl create sa tiller -n kube-system
+
+- name: Create ClusterRole and Binding
+  shell: >
+    kubectl create clusterrolebinding tiller --clusterrole cluster-admin --serviceaccount=kube-system:tiller
+
+- name: Install tiller
+  shell: >
+    helm init --service-account tiller
+
+- name: Install tiller
+  shell: >
+    sleep 30
+
+- name: Check Helm and Tiller
+  shell: >
+    helm version

@@ -1,0 +1,14 @@
+# User user namespace for accordion server
+namespace: accordion
+# Decide the size of Storage(Gi)
+storage: "{{ postgres_storage }}"
+# FIXME: use the right IP
+server: "{{ master_ip }}"
+path: "{{ accordion_nfs_path }}"
+licensepath: "{{ accordion_nfs_path }}/accordion/license"
+configpath: "{{ accordion_nfs_path }}/accordion/config"
+templatespath: "{{ accordion_nfs_path }}/accordion/templates"
+kubepath: "{{ accordion_nfs_path }}/accordion/kube"
+postgrespath: "{{ accordion_nfs_path }}/pgdata"
+accordion_ver: "{{ accordion_version }}"
+image: 127.0.0.1:30001/postgres

@@ -1,0 +1,82 @@
+---
+- name: Install nfs-utils
+  yum: name=nfs-utils state=latest
+  when: 
+    - install_mode == "online"
+
+#- name: Create the Token
+#  shell: "kubeadm token create"
+#  delegate_to: "{{ groups['master'][0] }}"
+#  register: create_token
+#  tags:
+#    - output
+
+- name: Check the Token
+  shell: "kubeadm token list | grep authentication | awk '{print $1}' | tail -1"
+  delegate_to: "{{ groups['master'][0] }}"
+  register: check_token
+  tags:
+    - output
+
+- name: Join nodes with master
+  shell: "kubeadm join --token {{ check_token.stdout }} {{ master_ip }}:{{ kube_apiserver_port }} --ignore-preflight-errors=all --discovery-token-unsafe-skip-ca-verification"
+  when: inventory_hostname in groups['minions'] or inventory_hostname in groups['infra']
+  register: kubeadm_join_command
+  tags:
+    - output
+
+- name: Configure nfs
+  shell: "echo -e '{{ accordion_nfs_path }} {{ hostvars[inventory_hostname].ansible_host }}(rw,sync,fsid=0,no_root_squash)' >> /etc/exports"
+  delegate_to: "{{ groups['master'][0] }}"
+  register: nfs_command
+
+- name: Restart nfs server
+  service: name=nfs-server state=restarted
+  delegate_to: "{{ groups['master'][0] }}"
+
+#- name: uncordon node
+#  shell: "kubectl uncordon {{ inventory_hostname }}"
+#  delegate_to: "{{ groups['master'][0] }}"
+#  register: uncordon_node
+#  tags:
+#    - output
+
+#- name: print output of kubeadm_join_command
+#  debug: msg="{{ kubeadm_join_command.stdout_lines }}"
+#  tags:
+#    - output
+
+- name: Template config.yaml
+  template:
+    src: config.yaml.j2
+    dest: /var/lib/kubelet/config.yaml
+  when:
+    - inventory_hostname in groups['minions'] or inventory_hostname in groups['infra']
+    - kubernetes_version | search('1.11') or kubernetes_version | search('1.12')
+
+- name: Template kubeadm-flags.env
+  template:
+    src: kubeadm-flags.env.j2
+    dest: /var/lib/kubelet/kubeadm-flags.env
+  when:
+    - inventory_hostname in groups['minions'] or inventory_hostname in groups['infra']
+    - kubernetes_version | search('1.11') or kubernetes_version | search('1.12')
+
+- name: Template kubelet
+  template:
+    src: kubelet.j2
+    dest: /etc/sysconfig/kubelet
+  when:
+    - inventory_hostname in groups['minions'] or inventory_hostname in groups['infra']
+    - kubernetes_version | search('1.11') or kubernetes_version | search('1.12')
+
+- name: Reload changing kubelet
+  command: systemctl daemon-reload
+
+- name: Start and enable services
+  service:
+    name: "{{ item }}"
+    state: restarted
+    enabled: yes
+  with_items:
+    - kubelet

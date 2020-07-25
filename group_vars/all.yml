@@ -1,0 +1,255 @@
+#- setup variable for cluster installation
+
+# For ha mode, please input virtual ip 
+master_ip:   150.149.49.43
+etcd_ip:     150.149.49.43
+registry_ip: 150.149.49.43
+
+install_option: kubernetes
+##########################################
+## For NFS Client provisioner
+##########################################
+provisioner_namespace: "infra"
+
+##########################################
+## For Docker
+##########################################
+docker_namespace: "infra"
+docker_cert_path: "/docker/cert"
+docker_registry_path: "/docker/registry"
+docker_registry_storage: 10
+docker_nfs_server: 150.149.49.83
+docker_nfs_path: "/appshr_elkp/nfs_docker"
+docker_registry_nodeport: 30001
+docker_registry_role : "master"
+docker_registry_domain: "myregistry.mwportal.com"
+
+##########################################
+## For Jenkins - Only PV/PVC - using Helm
+##########################################
+jenkins_namespace: "infra"
+jenkins_nfs_server: 150.149.49.83
+jenkins_path: "/appshr_elkp/nfs_jenkins"
+jenkins_storage: 10
+jenkins_host: "jenkins.mwportal.com"
+jenkins_nodePort: 30002
+jenkins_image: "jenkins/jenkins:lts"
+jenkins_node_role: "master"
+
+##########################################
+## For Prometheus
+##########################################
+prometheus_namespace: "monitoring"
+# prometheus_nfs_server: 150.149.49.83
+# prometheus_alertmanager_path: "/nfs_alertmanager"
+# prometheus_pushgateway_path: "/nfs_pushgateway"
+# prometheus_server_path: "/nfs_server"
+prometheus_storage: 4
+
+##########################################
+## For Grafana
+##########################################
+grafana_namespace: "monitoring"
+grafana_nfs_server: 150.149.49.83
+grafana_path: "/nfs_grafana"
+grafana_storage: 10
+
+##########################################
+## For ELK
+##########################################
+elasticsearch_namespace: "monitoring"
+
+##########################################
+## For Ingress
+##########################################
+ingress_http_port: 8080
+ingress_https_port: 8443
+
+##########################################
+## Installation mode (online / offline)
+##########################################
+install_mode: "online"
+
+##########################################
+## Accordion configuation
+##########################################
+master_isolation: "yes"
+master_host_name: "master"
+docker_default_path: "/var/lib/docker"
+
+##########################################
+# 3master mode( yes / no )
+##########################################
+#master_mode: "no"
+#master2_ip: 10.140.0.4
+#master3_ip: 10.140.0.5
+#master2_hostname: "acc-master2"
+#master3_hostname: "acc-master3"
+#haproxy_port: 8443
+
+##########################################
+# k8s apiserver
+##########################################
+kube_apiserver_bind_address: 0.0.0.0
+kube_apiserver_port: 6443
+kube_apiserver_node_port_range: "30000-32767"
+
+master_external_ip: "127.0.0.1"
+
+#########################
+## Loadbalancer (HA-mode)
+#########################
+loadbalancer_apiserver: "false"
+kube_override_hostname: "false"
+
+##########################################
+## Common
+##########################################
+kubernetes_version: "1.15.0"
+kubernetes_cni_version: "0.7.5"
+
+# kubernetes_version: "1.12.6"
+# kubernetes_cni_version: "0.6.0"
+
+timezone: Asia/Seoul
+etcd_port: 2379
+etcd_key: /default/network
+registry_port: 5000
+registry_nodePort: 30001
+etcd_version: 3.2.18
+
+download_keys_enabled: "false"
+add_node_enabled: "false"
+
+##########################################
+## Docker version
+##########################################
+docker_version: "docker-ce-18.09.7-3.el7.x86_64"
+
+#docker_version: "18.06.3"
+#docker_version: "docker-ce-18.06.0.ce-3.el7"
+#docker_version: "docker-ce-18.03.1.ce-1.el7.centos"
+#docker_version: "docker-ce-18.03.0.ce-1.el7.centos"
+#docker_version: "docker-ce-17.12.1.ce-1.el7.centos"
+#docker_version: "docker-ce-17.12.0.ce-1.el7.centos"
+#docker_version: "docker-ce-17.09.1.ce-1.el7.centos"
+#docker_version: "docker-ce-17.09.0.ce-1.el7.centos"
+#docker_version: "docker-ce-17.06.0.ce-1.el7.centos"
+#docker_version: "docker-ce-17.06.1.ce-1.el7.centos"
+#docker_version: "docker-ce-17.06.2.ce-1.el7.centos"
+#docker_version: "docker-ce-17.03.0.ce-1.el7.centos docker-ce-selinux-17.03.0.ce-1.el7.centos"
+#docker_version: "docker-ce-17.03.1.ce-1.el7.centos docker-ce-selinux-17.03.1.ce-1.el7.centos"
+#docker_version: "docker-ce-17.03.3.ce-1.el7 docker-ce-selinux-17.03.3.ce-1.el7"
+
+
+#########################
+## CNI (calico or weave)
+#########################
+network_cni: "weave"
+
+#############################################
+## Pod Network (Don't touch if usgin calico)
+#############################################
+pod_network_cidr: "192.168.0.0/16"
+
+#########################
+## Service Network
+#########################
+service_cidr: "10.96.0.0/12"
+
+#####################################
+## Can be modified if you use weave
+#####################################
+#IPALLOC_RANGE: "10.32.0.0/12"
+IPALLOC_RANGE: "172.32.0.0/12"
+
+#########################
+## Infra storage (GB)
+#########################
+influxdb_storage: 50
+elasticsearch_storage: 100
+postgres_storage: 10
+
+#########################
+## Monitroing period
+#########################
+kube_controller_node_monitor_grace_period: 40s
+kube_controller_node_monitor_period: 5s
+kube_controller_pod_eviction_timeout: 5m0s
+
+#########################
+## Monitoring Logging
+#########################
+efk_enabled: true
+
+#########################
+## Monitoring APM
+#########################
+apm_enabled: true
+
+#########################
+## Clound Privider
+#########################
+# 'gce', 'aws', 'azure', 'openstack', 'vsphere'
+#cloud_provide:
+
+#########################
+## Can be ipvs, iptables
+#########################
+kube_proxy_mode: iptables
+
+#########################
+## 1.10+ admission plugins
+#########################
+kube_apiserver_enable_admission_plugins: []
+
+#########################
+## 1.10+ list of disabled admission plugins
+#########################
+kube_apiserver_disable_admission_plugins: []
+
+#########################
+## 1.10+ list of extra args
+#########################
+kube_kubeadm_apiserver_extra_args: {}
+kube_kubeadm_controller_extra_args: {}
+kube_kubeadm_scheduler_extra_args: {}
+
+#########################
+## List of the preferred NodeAddressTypes to use for kubelet connections.
+#########################
+kubelet_preferred_address_types: 'InternalDNS,InternalIP,Hostname,ExternalDNS,ExternalIP'
+
+#########################
+## Kubernetes dir
+#########################
+kube_config_dir:     /etc/kubernetes
+manifest_config_dir: /etc/kubernetes/manifests
+cert_dir:            /etc/kubernetes/pki
+master_cert_dir:     /opt/kubernetes/pki
+kube_addon_dir:      /etc/kubernetes/addon
+weavedir:            /etc/cni/net.d
+
+#########################
+##- image and other variable
+#########################
+etcd_image:       gcr.io/google_containers/etcd-amd64:{{ etcd_version }} 
+api_image:        gcr.io/google_containers/kube-apiserver-amd64:v{{ kubernetes_version }}
+controller_image: gcr.io/google_containers/kube-controller-manager-amd64:v{{ kubernetes_version }}
+scheduler_image:  gcr.io/google_containers/kube-scheduler-amd64:v{{ kubernetes_version }}
+kube_proxy_image: gcr.io/google_containers/kube-proxy-amd64:v{{ kubernetes_version }}
+
+#########################
+## cluster dns name and IP
+#########################
+cluster_name: kubernetes
+
+#########################
+## A list of insecure registrys you might need to define
+#########################
+insecure_registrys:
+
+#########################
+## GPU monitoring(yes/no)
+#########################
+gpu_server: "no"

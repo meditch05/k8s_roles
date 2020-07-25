@@ -1,0 +1,8 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: nfs-config
+  namespace: {{ namespace }}
+data:
+  nfs.server: {{ server }}
+  nfs.path: {{ path }}

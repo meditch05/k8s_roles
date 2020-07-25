@@ -1,0 +1,6 @@
+---
+# User user namespace for topology
+docker_path: "{{ playbook_dir }}/../rpms/docker"
+rpm_path: "{{ playbook_dir }}/../rpms/rpm"
+ubuntu_docker_path: "{{ playbook_dir }}/../dpkgs/docker"
+dpkg_path: "{{ playbook_dir }}/../dpkgs/dpkg"

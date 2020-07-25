@@ -1,0 +1,94 @@
+---
+##################################################################################
+# Heapster : monitoring kubernetes resources
+##################################################################################
+- name: create kubernetes addon directory
+  file: path={{ kube_addon_dir }} state=directory
+  register: addon_dir
+  ignore_errors: True
+
+- name: create influxdb addon directory
+  file: path={{ kube_addon_dir }}/influxdb state=directory
+  register: addon_dir
+  ignore_errors: True
+
+#- name: install git
+#  yum: name=git state=latest
+
+#- git:
+#    repo: 'https://github.com/kubernetes/heapster.git'
+#    dest: "{{ kube_addon_dir }}/heapster"
+#  ignore_errors: True
+
+- name: influxdb directory
+  file: path={{ accordion_nfs_path }}/influxdb state=directory mode=0777
+  register: influxdb_dir
+  ignore_errors: True
+
+######### PV #####################################################################
+- name: Put {{ kube_addon_dir }}/influxdb/influxdb-pv.yaml file
+  template:
+    src: influxdb-pv.yaml.j2
+    dest: "{{ kube_addon_dir }}/influxdb/influxdb-pv.yaml"
+
+- name: Create a PV(Persistent Volume) for influxdb
+  shell: >
+    kubectl create -f {{ kube_addon_dir }}/influxdb/influxdb-pv.yaml
+  # ignore_errors: True
+
+######### PVC ####################################################################
+- name: Put {{ kube_addon_dir }}/influxdb/influxdb-pvc.yaml file
+  template:
+    src: influxdb-pvc.yaml.j2
+    dest: "{{ kube_addon_dir }}/influxdb/influxdb-pvc.yaml"
+
+- name: Create a PVC(Persistent Volume Claim) for influxdb
+  shell: >
+    kubectl create -f {{ kube_addon_dir }}/influxdb/influxdb-pvc.yaml
+  # ignore_errors: True
+
+######### Heapster ####################################################################
+- name: Copy {{ kube_addon_dir }}/influxdb/influxdb-deploy-svc.yaml file
+  template: 
+    src: influxdb-deploy-svc.yaml.j2 
+    dest: "{{ kube_addon_dir }}/influxdb/influxdb-deploy-svc.yaml"
+
+- name: Deploy the InfluxDB
+  shell: >
+    kubectl create -f {{ kube_addon_dir }}/influxdb/influxdb-deploy-svc.yaml
+  ignore_errors: True
+
+######### RBAC ####################################################################
+- name: Copy {{ kube_addon_dir }}/influxdb/heapster.yaml file
+  template: 
+    src: heapster.yaml.j2 
+    dest: "{{ kube_addon_dir }}/influxdb/heapster.yaml"
+
+- name: Create the Heapster service
+  shell: >
+    kubectl create -f {{ kube_addon_dir }}/influxdb/heapster.yaml
+  ignore_errors: True
+
+- name: Copy {{ kube_addon_dir }}/influxdb/heapster-rbac.yaml file
+  template: 
+    src: heapster-rbac.yaml.j2 
+    dest: "{{ kube_addon_dir }}/influxdb/heapster-rbac.yaml"
+
+- name: Create the Heapster RBAC
+  shell: >
+    kubectl create -f {{ kube_addon_dir }}/influxdb/heapster-rbac.yaml
+  ignore_errors: True
+
+######### Result #################################
+- name: list kubernetes' pods
+  shell: >
+    kubectl get pods --all-namespaces
+  changed_when: false
+  register: kubectl_get_pods
+  tags:
+    - output
+
+- name: print output of `kubectl get pods --all-namespaces`
+  debug: msg="{{ kubectl_get_pods.stdout_lines }}"
+  tags:
+    - output

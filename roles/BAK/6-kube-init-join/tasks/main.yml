@@ -1,0 +1,294 @@
+---
+- name: kubeadm aggregate all SANs
+  set_fact:
+    apiserver_sans: >-
+      kubernetes
+      kubernetes.default
+      kubernetes.default.svc
+      kubernetes.default.svc.cluster
+      kubernetes.default.svc.cluster.local
+      {{ master_ip }}
+      {{ ' '.join(groups['master']) }}
+      {%- if loadbalancer_apiserver == 'true' %}
+      {{ apiserver_loadbalancer_domain_name }}
+      {{ ' '.join(groups['backup-master']) }}
+      {{ apiserver_loadbalancer_vip }}
+      {{ master_host_name }}
+      {%- endif %}
+      {%- for host in groups['master'] %}
+      {{ hostvars[host]['ansible_host'] }}
+      {%- endfor %}
+      {{ master_external_ip }}
+      localhost
+      127.0.0.1
+      10.254.0.1
+      10.96.0.1
+  tags: facts
+  when:
+    - inventory_hostname in groups['master'] or inventory_hostname in groups['backup-master'] 
+
+- name: default addon directory
+  file: path={{ kube_addon_dir }} state=directory
+  register: default_addon_dir
+  when: inventory_hostname in groups['master'] or inventory_hostname in groups['master-cluster'] or inventory_hostname in groups['backup-master']
+  ignore_errors: True
+
+- name: kubeadm | Create kubeadm config master1
+  template:
+    src: kubeadm-config.yaml.j2
+    dest: "{{ kube_addon_dir }}/kubeadm-config.yaml"
+  register: kubeadm_config
+  when: 
+    - inventory_hostname in groups['master'] 
+
+- name: Kubeadm init on master node (weave)
+  shell: "kubeadm init --ignore-preflight-errors=all --config={{ kube_addon_dir }}/kubeadm-config.yaml"
+  register: kubeadm_init
+  when:
+    - network_cni == 'weave'
+    - inventory_hostname in groups['master']
+  ignore_errors: True
+
+- set_fact: adminit="{{kubeadm_init}}"
+  when: kubeadm_init.changed
+
+- name: Kubeadm init on master node (calico)
+  shell: "kubeadm init --ignore-preflight-errors=all --config={{ kube_addon_dir }}/kubeadm-config.yaml"
+  register: kubeadm_init
+  when: 
+    - network_cni == 'calico'
+    - inventory_hostname in groups['master'] 
+  ignore_errors: True
+
+- name: make direcotry (.kube)
+  file: path=/root/.kube state=directory
+  register: kubeconfig_addon_dir
+  ignore_errors: True
+  when: inventory_hostname in groups['master']
+
+- name: Copy admin.conf to .kube/config
+  copy:
+    src: /etc/kubernetes/admin.conf
+    dest: /root/.kube/config
+  when: inventory_hostname in groups['master']
+
+- set_fact: adminit="{{kubeadm_init}}"
+  when: kubeadm_init.changed
+
+########################
+# copy
+#######################
+#- name: Copy /etc/kubernetes/pki
+#  synchronize:
+#    src: /etc/kubernetes/pki
+#    dest: /etc/kubernetes/pki
+#  delegate_to: "{{ groups['master'][0] }}"
+#  when: 
+#    - inventory_hostname in groups['backup-master']
+#  ignore_errors: True
+
+########################
+# backup
+########################
+- name: Kubeadm init on backup-master node (weave)
+  shell: "kubeadm init --kubernetes-version=v{{ kubernetes_version }} --ignore-preflight-errors=all --pod-network-cidr={{ pod_network_cidr }} --token-ttl 0"
+  #shell: "kubeadm init --ignore-preflight-errors=all --config={{ kube_addon_dir }}/kubeadm-config.yaml"
+  when:
+    - network_cni == 'weave'
+    - inventory_hostname in groups['backup-master']
+  ignore_errors: True
+
+- name: Kubeadm init on backup-master node (calico)
+  shell: "kubeadm init --kubernetes-version=v{{ kubernetes_version }} --ignore-preflight-errors=all --pod-network-cidr={{ pod_network_cidr }} --token-ttl 0"
+  #shell: "kubeadm init --ignore-preflight-errors=all --config={{ kube_addon_dir }}/kubeadm-config.yaml"
+  when:
+    - network_cni == 'calico'
+    - inventory_hostname in groups['backup-master']
+  ignore_errors: True
+
+- name: make direcotry (.kube)
+  file: path=/root/.kube state=directory
+  register: kubeconfig_addon_dir
+  ignore_errors: True
+  when: inventory_hostname in groups['backup-master']
+
+- name: Copy admin.conf to .kube/config
+  copy:
+    src: /etc/kubernetes/admin.conf
+    dest: /root/.kube/config
+    remote_src: yes
+  when: inventory_hostname in groups['backup-master']
+
+###################
+- name: Get the token id from the master initialization
+  shell: "echo '{{ adminit.stdout }}' | tail -n1 | awk '{print $4}'"
+  register: kubeadm_token
+  when:
+    - kubernetes_version | search('1.9')
+    - inventory_hostname in groups['master']
+
+- name: set var fact
+  set_fact:
+    token: "{{ kubeadm_token }}"
+  when: kubeadm_token.changed
+
+- name: Get the token id from the master initialization
+  shell: "echo '{{ adminit.stdout }}' | tail -n1 | awk '{print $5}'"
+  register: kubeadm_token
+  when:
+    - kubernetes_version | search('1.10')
+    - inventory_hostname in groups['master']
+
+- name: set var fact
+  set_fact:
+    token: "{{kubeadm_token}}"
+  when: kubeadm_token.changed
+
+- name: Get the token id from the master initialization
+  shell: "echo '{{ adminit.stdout }}' | tail -n1 | awk '{print $5}'"
+  register: kubeadm_token
+  when:
+    - kubernetes_version | search('1.11') or kubernetes_version | search('1.12')
+    - inventory_hostname in groups['master']
+
+- name: set var fact
+  set_fact:
+    token: "{{kubeadm_token}}"
+  when: kubeadm_token.changed
+
+- name: print output of kubeadm_token
+  vars:
+    join_token: "{{ token.stdout_lines }}"
+  debug: msg="{{ token.stdout_lines }}"
+  when: inventory_hostname in groups['master']
+  tags:
+    - output
+
+- name: Get the IP and port from the master initialization
+  shell: "echo '{{ adminit.stdout }}' | tail -n1 | awk '{print $5}'"
+  register: kubeadm_master_ip_port
+  when: 
+    - kubernetes_version | search('1.9')
+    - inventory_hostname in groups['master']
+
+- name: set var fact
+  set_fact:
+    ip_port: "{{kubeadm_master_ip_port}}"
+  when: kubeadm_master_ip_port.changed
+
+- name: Get the IP and port from the master initialization
+  shell: "echo '{{ adminit.stdout }}' | tail -n1 | awk '{print $3}'"
+  register: kubeadm_master_ip_port
+  when: 
+    - kubernetes_version | search('1.10')
+    - inventory_hostname in groups['master']
+
+- name: set var fact
+  set_fact:
+    ip_port: "{{kubeadm_master_ip_port}}"
+  when: kubeadm_master_ip_port.changed
+
+- name: Get the IP and port from the master initialization
+  shell: "echo '{{ adminit.stdout }}' | tail -n1 | awk '{print $3}'"
+  register: kubeadm_master_ip_port
+  when:
+    - kubernetes_version | search('1.11') or kubernetes_version | search('1.12')
+    - inventory_hostname in groups['master']
+
+- name: set var fact
+  set_fact:
+    ip_port: "{{kubeadm_master_ip_port}}"
+  when: kubeadm_master_ip_port.changed
+
+- name: print output of kubeadm_master_ip_port
+  vars:
+    join_ip_port: "{{ ip_port.stdout_lines }}"
+  debug: msg="{{ ip_port.stdout_lines }}"
+  when: inventory_hostname in groups['master']
+  tags:
+    - output
+
+- name: Join nodes with master
+  #shell: "kubeadm join --token {{ hostvars[groups['master'][0]].kubeadm_token.stdout }} {{ hostvars[groups['master'][0]].kubeadm_master_ip_port.stdout }} --ignore-preflight-errors=all --discovery-token-unsafe-skip-ca-verification"
+  shell: "kubeadm join --token {{ hostvars[groups['master'][0]].token.stdout }} {{ hostvars[groups['master'][0]].ip_port.stdout }} --ignore-preflight-errors=all --discovery-token-unsafe-skip-ca-verification"
+  register: kubeadm_join_command
+  tags:
+    - output
+  when:
+    - inventory_hostname in groups['minions'] or inventory_hostname in groups['infra']
+
+- name: Master Isolation
+  shell: >
+    kubectl taint nodes --all node-role.kubernetes.io/master-
+  when:
+    - master_isolation == 'no'
+    - inventory_hostname in groups['master']
+  ignore_errors: True
+
+- name: Backup-Master Isolation
+  shell: >
+    kubectl taint nodes --all node-role.kubernetes.io/master-
+  delegate_to: 127.0.0.1
+  when:
+    - master_isolation == 'no'
+    - inventory_hostname in groups['backup-master']
+  ignore_errors: True
+
+- name: Template config.yaml
+  template:
+    src: config.yaml.j2
+    dest: /var/lib/kubelet/config.yaml
+  when:
+    - inventory_hostname in groups['master'] or inventory_hostname in groups['minions'] or inventory_hostname in groups['infra']
+    - kubernetes_version | search('1.11') or kubernetes_version | search('1.12')
+
+- name: Template kubeadm-flags.env
+  template:
+    src: kubeadm-flags.env.j2
+    dest: /var/lib/kubelet/kubeadm-flags.env
+  when:
+    - inventory_hostname in groups['master'] or inventory_hostname in groups['minions'] or inventory_hostname in groups['infra']
+    - kubernetes_version | search('1.11') or kubernetes_version | search('1.12')
+    
+- name: Template kubelet
+  template:
+    src: kubelet.j2
+    dest: /etc/sysconfig/kubelet
+  when:
+    - inventory_hostname in groups['master'] or inventory_hostname in groups['minions'] or inventory_hostname in groups['infra']
+    - kubernetes_version | search('1.11') or kubernetes_version | search('1.12')
+
+- name: Reload changing kubelet
+  command: systemctl daemon-reload
+
+- name: Start and enable services
+  service:
+    name: "{{ item }}"
+    state: restarted
+    enabled: yes
+  with_items:
+    - kubelet
+
+- wait_for:
+    host: 127.0.0.1
+    port: "{{ kube_apiserver_port }}"
+    delay: 10
+  when: inventory_hostname in groups['master']
+
+- name: Copy coredns_configmap.sh
+  copy:
+    src: coredns_configmap.sh
+    dest: "{{ kube_addon_dir }}/coredns_configmap.sh"
+  when: inventory_hostname in groups['master']
+
+- name: "Mode 755 for coredns_configmap.sh"
+  file:
+    path: "{{ kube_addon_dir }}/coredns_configmap.sh"
+    mode: 0755
+  when: inventory_hostname in groups['master']
+
+- name: Run coredns_configmap.sh
+  shell: >
+    /bin/sh -c "{{ kube_addon_dir }}/coredns_configmap.sh"
+  when: inventory_hostname in groups['master']
+

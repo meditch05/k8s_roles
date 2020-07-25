@@ -1,0 +1,101 @@
+---
+- name: Copy weave
+  copy: src=weave dest=/usr/local/bin/weave
+  ignore_errors: True
+  when:
+    - network_cni == 'weave'
+
+- name: "Mode 755 for weave"
+  file:
+    path: "/usr/local/bin/weave"
+    mode: 0755
+  when:
+    - network_cni == 'weave'
+
+- name: weave network reset
+  shell: >
+    weave reset
+  ignore_errors: True
+  when:
+    - network_cni == 'weave'
+
+- name: Teardown kube nodes
+  shell: >
+    kubeadm reset
+  ignore_errors: True
+  when:
+    - kubernetes_version | search('1.9')
+
+- name: Teardown kube nodes
+  shell: >
+    kubeadm reset
+  ignore_errors: True
+  when:
+    - kubernetes_version | search('1.10')
+ 
+- name: Teardown kube nodes
+  shell: >
+    kubeadm reset -f
+  ignore_errors: True
+  when:
+    - kubernetes_version | search('1.11') or kubernetes_version | search('1.12')
+
+- name: Remove all semaphores
+  file:
+    dest: "{{ item }}"
+    state: absent
+  with_items:
+    - "/etc/.kubeadm-complete"
+#    - "{{ kubectl_home }}/.kubeadm-podnetwork-complete"
+    - "/etc/.kubeadm-joined"
+#    - "{{ kubectl_home }}/admin.conf"
+  ignore_errors: True
+
+- name: stop nfs-server
+  service:
+    name: nfs-server
+    state: stopped
+  ignore_errors: True
+
+- name: Remove nfs-utils
+  yum: name=nfs-utils state=absent
+  ignore_errors: True
+
+- name: Remove kubectl
+  yum: name=kubectl-{{ kubernetes_version }}-0.x86_64 state=absent
+  ignore_errors: True
+
+- name: Remove kubelet
+  yum: name=kubelet-{{ kubernetes_version }}-0.x86_64 state=absent
+  ignore_errors: True
+
+- name: Remove kubeadm
+  yum: name=kubeadm-{{ kubernetes_version }}-0.x86_64 state=absent
+  ignore_errors: True
+
+- name: Remove kubernetes-cni
+  yum: name=kubernetes-cnt-{{ kubernetes_version }}-0.x86_64 state=absent
+  ignore_errors: True
+
+- name: Remove alias
+  shell: >
+    sed -i '/kubectl/d' /root/.bashrc
+
+- name: source bashrc
+  shell: source ~/.bashrc
+  args:
+    executable: /bin/bash
+
+- name: remove docker
+  yum:
+    name: "{{ item }}"
+    state: absent
+  with_items:
+    - docker
+    - docker-common
+    - docker-selinux
+    - docker-engine
+    - container-selinux
+    - docker-ce
+    - docker-ce-selinux
+  ignore_errors: True

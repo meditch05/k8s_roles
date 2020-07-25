@@ -1,0 +1,49 @@
+---
+#- hostname: name={{ inventory_hostname }}
+#  become: yes
+
+- name: Disable seLinux
+  shell: "setenforce 0"
+  ignore_errors: yes
+
+- name: Disabled selinux
+  selinux: state=disabled
+  ignore_errors: yes
+
+- name: Stop the firewall
+  service: name=firewalld state=stopped enabled=no
+  ignore_errors: yes
+
+- name: Disable firewalld
+  shell: "systemctl disable firewalld && systemctl stop firewalld"
+  ignore_errors: yes
+
+- name: Turn Off Swap
+  shell: "swapoff -a"
+
+- name: Remove swapfile from /etc/fstab
+  mount:
+    name: swap
+    fstype: swap
+    state: absent
+
+- name: Copy /etc/sysctl.conf
+  copy: src=sysctl.conf dest=/etc/sysctl.conf
+
+- name: Install ntpd
+  yum: name=ntp state=installed 
+
+- name: Set timezone to {{ timezone }}
+  timezone: name={{ timezone }}
+
+- name: Enable and Start ntpd
+  service: name=ntpd state=restarted enabled=yes
+
+- name: modprobe br_netfilter
+  shell: "modprobe br_netfilter"
+
+# - name: Installing the epel repository on CentOS 7 / RHEL 7
+#   shell: "rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
+
+#- name: Upgrade all packages
+#  yum: name='*' state=latest

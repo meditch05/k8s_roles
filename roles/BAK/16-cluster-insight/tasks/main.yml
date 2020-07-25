@@ -1,0 +1,97 @@
+---
+##################################################################################
+# Cluster-insight : Topology graph for kubernetes resources
+##################################################################################
+- name: create kubernetes addon directory
+  file: path={{ kube_addon_dir }} state=directory
+  register: addon_dir
+  ignore_errors: True
+
+- name: cluster-insight addon directory
+  file: path={{ kube_addon_dir }}/cluster-insight state=directory
+  register: cluster-insight_addon_dir
+  ignore_errors: True
+
+######### Petch the cluster-insight image from docker hub #####################################
+- name: tar files
+  shell: >
+    docker load -i {{ tar_path }}/cluster-insight.tar
+    
+- name: docker tag
+  shell: >
+    docker tag {{ image_source }} {{ image }}
+    #docker tag byouloh/cluster-insight:v2.0 127.0.0.1:30001/cluster-insight:v2.0
+
+- name: login into registry
+  shell: >
+    docker login 127.0.0.1:{{ registry_nodePort }} -u=accordion -p=accadmin
+    #docker login 127.0.0.1:30001 -u=accordion -p=accadmin
+- name: docker push
+  shell: >
+    docker push {{ image }}
+    #docker push 127.0.0.1:30001/cluster-insight:v2.0
+
+######### Create the cluster-insight namespace #####################################
+- name: Check the namespace
+  shell: "kubectl get namespaces | grep {{ namespace }}"
+  delegate_to: "{{ groups['master'][0] }}"
+  run_once: true
+  register: check_namespace
+  ignore_errors: True
+
+- name: Create a namespace for cluster-insight
+  when: check_namespace|failed
+  shell: >
+    kubectl create ns {{ namespace }}
+  delegate_to: "{{ groups['master'][0] }}"
+  run_once: true
+  ignore_errors: True
+
+######### Deployment ################################################################
+- name: Put {{ kube_addon_dir }}/cluster-insight/cluster-insight.yaml file
+  template:
+    src: cluster-insight.yaml.j2
+    dest: "{{ kube_addon_dir }}/cluster-insight/cluster-insight.yaml"
+  # when: inventory_hostname in groups['master']
+
+- name: Deploy the Cluster-insight
+  shell: >
+    kubectl create -f {{ kube_addon_dir }}/cluster-insight/cluster-insight.yaml
+  ignore_errors: True
+
+######### Result #################################
+- name: list kubernetes' pods
+  shell: >
+    kubectl get pods --all-namespaces
+  changed_when: false
+  register: kubectl_get_pods
+  tags:
+    - output
+
+- name: print output of `kubectl get pods --all-namespaces`
+  debug: msg="{{ kubectl_get_pods.stdout_lines }}"
+  tags:
+    - output
+
+# ######### Service ################################################################
+# - name: Copy {{ kube_addon_dir }}/cluster-insight/install/cluster-insight-service.yaml file
+#   template: 
+#     src: cluster-insight-service.yaml.j2 
+#     dest: "{{ kube_addon_dir }}/cluster-insight/install/cluster-insight-service.yaml"
+
+# - name: Launch the service
+#   shell: >
+#     kubectl create -f {{ kube_addon_dir }}/cluster-insight/install/cluster-insight-service.yaml
+#   ignore_errors: True
+
+# ######### Deployment ################################################################
+# - name: Put {{ kube_addon_dir }}/cluster-insight/install/cluster-insight-deployment.yaml file
+#   template:
+#     src: cluster-insight-deployment.yaml.j2
+#     dest: "{{ kube_addon_dir }}/cluster-insight/install/cluster-insight-deployment.yaml"
+#   # when: inventory_hostname in groups['master']
+
+# - name: Deploy the Cluster-insight
+#   shell: >
+#     kubectl create -f {{ kube_addon_dir }}/cluster-insight/install/cluster-insight-deployment.yaml
+#   ignore_errors: True

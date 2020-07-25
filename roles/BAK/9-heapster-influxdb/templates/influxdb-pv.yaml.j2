@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: influxdb-data
+  labels:
+   volume-task: influxdb
+spec:
+  capacity:
+    storage: {{ storage }}Gi
+  accessModes:
+    - ReadWriteMany
+  nfs:
+    # FIXME: use the right IP
+    server: {{ server }}
+    path: {{ path }}

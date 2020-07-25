@@ -1,0 +1,189 @@
+#!/bin/bash
+# ---------------------------------------------------------
+#   Accordion v1.1             http://www.mantech.co.kr/
+#
+#   Copyright(C) 2018, Mantech, All Rights Reserved.
+# ---------------------------------------------------------
+
+OPTS=$1
+PARAM1=$2
+PARAM2=$3
+
+usage()
+{
+  echo "Usage: accordion [options]"
+  echo ""
+  echo "options:"
+  echo "  -i, --info        Display Cluster (Pod/Service) information."
+  echo "  -d, --detail      Display Cluster (Node/Pod/Service/PV..) information."
+  echo "  -e, --exec        Get a Shell to a Running Container."
+  echo "  -l, --log         Print the logs for a container in accordion pod." 
+  echo "  --logdown         Copy files and directories to and from accordon container."
+  echo "  --applog          Print the logs for a pod."
+  echo "  --conlog          Print the logs for a deployment."
+  echo "  --conlogdown      Copy files and directories to and from app container."
+  echo "  -v, --version     Display the accorion version information."
+  echo "  -h, --help: Help about any command"
+}
+
+accordion_info() {
+  echo "========================================"
+  echo " Services "
+  echo "========================================"
+  kubectl get svc --all-namespaces
+  echo "========================================"
+  echo " Pods "
+  echo "========================================"
+  kubectl get po --all-namespaces
+}
+
+accordion_detail_info() {
+  echo "========================================"
+  echo " nodes "
+  echo "========================================"
+  kubectl get nodes
+  
+  echo "========================================"
+  echo " deployments"
+  echo "========================================"
+  kubectl get deployments --all-namespaces
+  
+  echo "========================================"
+  echo " statefulset "
+  echo "========================================"
+  kubectl get statefulset --all-namespaces
+  
+  echo "========================================"
+  echo " po / svc "
+  echo "========================================"
+  kubectl get po,svc -o wide --all-namespaces
+  
+  echo "========================================"
+  echo " pv "
+  echo "========================================"
+  kubectl get pv
+  
+  echo "========================================"
+  echo " pvc "
+  echo "========================================"
+  kubectl get pvc --all-namespaces
+  
+  echo "========================================"
+  echo " storage class "
+  echo "========================================"
+  kubectl get storageclass 
+  
+  echo "========================================"
+  echo " events "
+  echo "========================================"
+  kubectl get events --all-namespaces
+}
+
+if [ $# -eq 0 ]
+  then
+    usage
+    exit 1
+fi
+
+accordion_log() {
+  accordion=`kubectl get po -n accordion | grep accordion | awk '{print $1}'`
+  kubectl logs -f --tail=100 $accordion -n accordion
+}           
+
+accordion_logdown() {
+  accordion=`kubectl get po -n accordion | grep accordion | awk '{print $1}'`
+  #fname=`kubectl exec $accordion -n accordion -- /bin/ls -ltr /usr/local/tomcat/logs/ | awk '{print $NF}' | grep cata | grep -v grep`
+  kubectl cp accordion/$accordion:logs/ -c accordion accordion.log
+}
+
+accordion_version() {
+  accordion=`kubectl get po -n accordion | grep accordion | awk '{print $1}'`
+  image=`kubectl get po $accordion -n accordion -o jsonpath="{..image}" | tr -s '[[:space:]]' '\n' | sort | uniq | awk -F'/' '{print $2}'`
+  echo $image
+}           
+
+app_exec() {
+  if [ "$PARAM1" == "" ] || [ "$PARAM2" == "" ];
+  then
+    echo "Usage: accoridon -e [project_name] [pod_name]"
+    exit 1
+  fi
+  kubectl exec -it $PARAM2 -n $PARAM1 -- /bin/bash
+}
+
+app_log() {
+  if [ "$PARAM1" == "" ] || [ "$PARAM2" == "" ];
+  then
+    echo "Usage: accoridon --applog [project_name] [app_name]"
+    exit 1
+  fi
+  kubectl logs -f --tail=100 deployments/$PARAM2 -c tomcat -n $PARAM1
+}
+
+container_log() {
+  if [ "$PARAM1" == "" ] || [ "$PARAM2" == "" ];
+  then
+    echo "Usage: accoridon --conlog [project_name] [pod_name]"
+    exit 1
+  fi
+  kubectl logs -f --tail=100 $PARAM2 -c tomcat -n $PARAM1
+}
+
+container_logdown() {
+  if [ "$PARAM1" == "" ] || [ "$PARAM2" == "" ];
+  then
+    echo "Usage: accoridon --conlogdown [project_name] [pod_name]"
+    exit 1
+  fi
+  kubectl cp $PARAM1/$PARAM2:logs/ -c tomcat app.log
+}
+
+while [ "$1" != "" ]; do
+    case "$OPTS" in
+        -h | --help)
+            usage
+            exit
+            ;;
+        -i | --info)
+            accordion_info
+            exit
+            ;;
+        -d | --detail)
+            accordion_detail_info
+            exit
+            ;;
+        -e | --exec)
+            app_exec
+            exit
+            ;;
+        -l | --log)
+            accordion_log
+            exit
+            ;;
+        --applog)
+            app_log
+            exit
+            ;;
+        --conlog)
+            container_log
+            exit
+            ;;
+        --logdown)
+            accordion_logdown
+            exit
+            ;;
+        --conlogdown)
+            container_logdown
+            exit
+            ;;
+        -v | -V | --version)
+            accordion_version
+            exit
+            ;;
+        *)
+            usage
+            exit 1
+            ;;
+    esac
+    shift
+done

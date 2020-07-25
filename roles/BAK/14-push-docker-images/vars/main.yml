@@ -1,0 +1,2 @@
+tar_path : "{{ playbook_dir }}/../tar_docker"
+port: "{{ registry_nodePort }}"

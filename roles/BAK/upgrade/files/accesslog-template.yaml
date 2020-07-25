@@ -1,0 +1,72 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: accesslog-template
+  namespace: {{ nameSpcae }}
+data:
+  accesslog_template: |-
+    {
+      "index_patterns": [
+            "ac-*"
+        ],
+      "mappings": {
+        "fluentd": {
+          "properties": {
+            "agent": {
+              "type": "text"
+            },
+            "code": {
+              "type": "integer"
+            },
+            "method": {
+              "type": "keyword"
+            },
+            "Log-Level": {
+              "type": "text"
+            },
+            "podname": {
+              "type": "text"
+            },
+            "message": {
+              "type": "text"
+            },
+            "remoteId": {
+              "type": "text"
+            },
+            "elapse": {
+              "type": "text"
+            },
+            "path": {
+              "type": "keyword"
+            },
+            "datetime": {
+              "type": "text"
+            },
+            "protocol": {
+              "type": "text"
+            },
+            "@timestamp": {
+              "type": "date"
+            },
+            "size": {
+              "type": "text"
+            },
+            "host": {
+              "type": "keyword"
+            },
+            "namespace": {
+              "type": "text"
+            },
+            "client": {
+              "type": "text"
+            },
+            "tag": {
+              "type": "text"
+            },
+            "user": {
+              "type": "text"
+            }
+          }
+        }
+      }
+    }

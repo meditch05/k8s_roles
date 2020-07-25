@@ -1,0 +1,2 @@
+helm install -f mariadb_values.yml stable/mariadb --name mwportal-db --namespace p065336
+helm del --purge mwportal-db

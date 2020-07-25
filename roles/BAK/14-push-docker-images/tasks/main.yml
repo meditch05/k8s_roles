@@ -1,0 +1,222 @@
+---
+######### Push Docker images #####################################
+######### Registry Health Check ######################
+- wait_for:
+    host: {{ master_ip }}
+    port: "{{ docker_registry_nodeport }}"
+    delay: 10
+######### Busybox #####################################
+- name: tar files
+  shell: >
+    docker load -i {{ tar_path }}/busybox.tar
+
+- name: login into registry
+  shell: >
+    docker login 127.0.0.1:{{ docker_registry_nodeport }} -u=webwas -p=alskfl12~!
+
+- name: tag
+  shell: >
+    docker tag busybox 127.0.0.1:{{ docker_registry_nodeport }}/busybox
+
+- name: push files
+  shell: >
+    docker push 127.0.0.1:{{ docker_registry_nodeport }}/busybox
+
+######### Tensorflow #####################################
+- name: tar files
+  shell: >
+    docker load -i {{ tar_path }}/tensorflow.tar
+
+- name: login into registry
+  shell: >
+    docker login 127.0.0.1:{{ registry_nodePort }} -u=accordion -p=accadmin
+
+- name: tag
+  shell: >
+    docker tag tensorflow/tensorflow:latest 127.0.0.1:{{ registry_nodePort }}/tensorflow:latest
+
+- name: push files
+  shell: >
+    docker push 127.0.0.1:{{ registry_nodePort }}/tensorflow:latest
+
+
+######### Tomcat 7 #####################################
+- name: tar files
+  shell: >
+    docker load -i {{ tar_path }}/tomcat7jre7.tar
+
+- name: login into registry
+  shell: >
+    docker login 127.0.0.1:{{ registry_nodePort }} -u=accordion -p=accadmin
+
+- name: tag
+  shell: >
+    docker tag accordion/tomcat7:jre7 127.0.0.1:{{ registry_nodePort }}/tomcat7:jre7
+
+- name: push files
+  shell: >
+    docker push 127.0.0.1:{{ registry_nodePort }}/tomcat7:jre7
+
+######### Tomcat 8 #####################################
+- name: tar files
+  shell: >
+    docker load -i {{ tar_path }}/tomcat8jre7.tar
+    
+- name: login into registry
+  shell: >
+    docker login 127.0.0.1:{{ registry_nodePort }} -u=accordion -p=accadmin
+    
+- name: tag
+  shell: >
+    docker tag accordion/tomcat8:jre7 127.0.0.1:{{ registry_nodePort }}/tomcat8:jre7
+    
+- name: push files
+  shell: >
+    docker push 127.0.0.1:{{ registry_nodePort }}/tomcat8:jre7
+
+- name: tar files
+  shell: >
+    docker load -i {{ tar_path }}/tomcat8jre8.tar
+
+- name: login into registry
+  shell: >
+    docker login 127.0.0.1:{{ registry_nodePort }} -u=accordion -p=accadmin
+    
+- name: tag
+  shell: >
+    docker tag accordion/tomcat8:jre8 127.0.0.1:{{ registry_nodePort }}/tomcat8:jre8
+    
+- name: push files
+  shell: >
+    docker push 127.0.0.1:{{ registry_nodePort }}/tomcat8:jre8
+######### Tomcat 9 #####################################
+- name: tar files
+  shell: >
+    docker load -i {{ tar_path }}/tomcat9.tar
+    
+- name: login into registry
+  shell: >
+    docker login 127.0.0.1:{{ registry_nodePort }} -u=accordion -p=accadmin
+    
+- name: tag
+  shell: >
+    docker tag accordion/tomcat9:jre8 127.0.0.1:{{ registry_nodePort }}/tomcat9:jre8
+    
+- name: push files
+  shell: >
+    docker push 127.0.0.1:{{ registry_nodePort }}/tomcat9:jre8
+######### Wildfly #####################################
+- name: tar files
+  shell: >
+    docker load -i {{ tar_path }}/wildfly.tar
+    
+- name: login into registry
+  shell: >
+    docker login 127.0.0.1:{{ registry_nodePort }} -u=accordion -p=accadmin
+    
+- name: tag
+  shell: >
+    docker tag accordion/wildfly:latest 127.0.0.1:{{ registry_nodePort }}/wildfly
+    
+- name: push files
+  shell: >
+    docker push 127.0.0.1:{{ registry_nodePort }}/wildfly
+######### PostgreSQL for Accordion #####################################
+- name: tar files
+  shell: >
+    docker load -i {{ tar_path }}/postgres.tar
+    
+- name: login into registry
+  shell: >
+    docker login 127.0.0.1:{{ registry_nodePort }} -u=accordion -p=accadmin
+    
+- name: tag
+  shell: >
+    docker tag accordion/postgres:latest 127.0.0.1:{{ registry_nodePort }}/postgres
+    
+- name: push files
+  shell: >
+    docker push 127.0.0.1:{{ registry_nodePort }}/postgres
+######### Accordion #####################################
+- name: tar files
+  shell: >
+    docker load -i {{ tar_path }}/accordion.tar
+    
+- name: login into registry
+  shell: >
+    docker login 127.0.0.1:{{ registry_nodePort }} -u=accordion -p=accadmin
+    
+- name: tag
+  shell: >
+    docker tag accordion/accordion:{{ accordion_version }} 127.0.0.1:{{ registry_nodePort }}/accordion:{{ accordion_version }}
+    
+- name: push files
+  shell: >
+    docker push 127.0.0.1:{{ registry_nodePort }}/accordion
+######### scouter-collector #####################################
+- name: tar files
+  shell: >
+    docker load -i {{ tar_path }}/monitor-server.tar
+    
+- name: login into registry
+  shell: >
+    docker login 127.0.0.1:{{ registry_nodePort }} -u=accordion -p=accadmin
+
+- name: tag
+  shell: >
+    docker tag accordion/scouter-server:latest 127.0.0.1:{{ registry_nodePort }}/scouter-server
+
+- name: push files
+  shell: >
+    docker push 127.0.0.1:{{ registry_nodePort }}/scouter-server
+
+######### fluentd #####################################
+- name: tar files
+  shell: >
+    docker load -i {{ tar_path }}/fluentd.tar
+
+- name: login into registry
+  shell: >
+    docker login 127.0.0.1:{{ registry_nodePort }} -u=accordion -p=accadmin
+
+- name: tag
+  shell: >
+    docker tag gcr.io/google-containers/fluentd-elasticsearch:v2.4.0 127.0.0.1:{{ registry_nodePort }}/fluentd
+
+- name: push files
+  shell: >
+    docker push 127.0.0.1:{{ registry_nodePort }}/fluentd
+
+######### jenkins #####################################
+- name: tar files
+  shell: >
+    docker load -i {{ tar_path }}/jenkins.tar
+
+- name: login into registry
+  shell: >
+    docker login 127.0.0.1:{{ registry_nodePort }} -u=accordion -p=accadmin
+
+- name: tag
+  shell: >
+    docker tag accordion/jenkins:latest 127.0.0.1:{{ registry_nodePort }}/jenkins:latest
+
+- name: push files
+  shell: >
+    docker push 127.0.0.1:{{ registry_nodePort }}/jenkins:latest
+
+######### app-scheduler #####################################
+- name: tar files
+  shell: >
+    docker load -i {{ tar_path }}/app-scheduler.tar
+
+- name: login into registry
+  shell: >
+    docker login 127.0.0.1:{{ registry_nodePort }} -u=accordion -p=accadmin
+
+- name: tag
+  shell: >
+    docker tag accordion/app-scheduler:1.0 127.0.0.1:{{ registry_nodePort }}/accordion/app-scheduler:1.0
+
+- name: push files
+  shell: >
+    docker push 127.0.0.1:{{ registry_nodePort }}/accordion/app-scheduler:1.0

@@ -1,0 +1,6 @@
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+
+192.168.56.113 vm-master1 myregistry.mwportal.com
+192.168.56.114 vm-worker1
+192.168.56.115 vm-worker2

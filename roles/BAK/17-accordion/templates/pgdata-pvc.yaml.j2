@@ -1,0 +1,14 @@
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: pgdata-pvc
+  namespace: {{ namespace }} 
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: {{ storage }}Gi
+  selector:
+    matchLabels:
+      volume-task: postgres

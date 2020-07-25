@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: jenkins-data
+  labels:
+   #volume-type: ssd
+   volume-task: build
+spec:
+  capacity:
+    storage: {{ jenkins_storage }}Gi
+  accessModes:
+    - ReadWriteMany
+  nfs:
+    # FIXME: use the right IP
+    server: {{ jenkins_nfs_server }}
+    path: {{ jenkins_nfs_path }}

@@ -1,0 +1,217 @@
+---
+- name: Copy dockers
+  synchronize:
+    src: "{{ docker_path }}"
+    dest: /tmp
+  when: 
+    - inventory_hostname in groups['minions'] or inventory_hostname in groups['infra'] or inventory_hostname in groups['backup-master']
+
+- name: Copy rpms
+  synchronize:
+    src: "{{ rpm_path }}"
+    dest: /tmp
+  when: 
+    - inventory_hostname in groups['minions'] or inventory_hostname in groups['infra'] or inventory_hostname in groups['backup-master']
+
+- name: "Mode 755 for run.sh (nodes)"
+  file:
+    path: "/tmp/rpm/run.sh"
+    mode: 0755
+  when: 
+    - inventory_hostname in groups['minions'] or inventory_hostname in groups['infra'] or inventory_hostname in groups['backup-master']
+    - install_option == "full" or install_option == "kubernetes"
+
+- name: "Mode 755 for run_accordion.sh (nodes)"
+  file:
+    path: "/tmp/rpm/run_accordion.sh"
+    mode: 0755
+  when:
+    - inventory_hostname in groups['minions'] or inventory_hostname in groups['infra'] or inventory_hostname in groups['backup-master']
+    - install_option == "accordion" or install_option == "diamanti"
+
+- name: Run rpm-install (nodes)
+  shell: >
+    /bin/bash -c "/tmp/rpm/run.sh"
+  args:
+    chdir: "/tmp/rpm/"
+  when: 
+    - inventory_hostname in groups['minions'] or inventory_hostname in groups['infra'] or inventory_hostname in groups['backup-master']
+    - install_option == "full" or install_option == "kubernetes"
+
+- name: Run rpm-install (nodes)
+  shell: >
+    /bin/bash -c "/tmp/rpm/run_accordion.sh"
+  args:
+    chdir: "/tmp/rpm/"
+  when:
+    - inventory_hostname in groups['minions'] or inventory_hostname in groups['infra'] or inventory_hostname in groups['backup-master']
+    - install_option == "accordion" or install_option == "diamanti"
+
+- name: "Mode 755 for run.sh (master)"
+  file:
+    path: "{{ rpm_path }}/run.sh"
+    mode: 0755
+  when: 
+    - inventory_hostname in groups['master']
+    - install_option == "full" or install_option == "kubernetes"
+
+- name: "Mode 755 for run_accordion.sh (master)"
+  file:
+    path: "{{ rpm_path }}/run_accordion.sh"
+    mode: 0755
+  when:
+    - inventory_hostname in groups['master']
+    - install_option == "accordion" or install_option == "diamanti"
+
+- name: Run rpm-install (master)
+  shell: >
+    /bin/bash -c "{{ rpm_path }}/run.sh"
+  args:
+    chdir: "{{ rpm_path }}"
+  when: 
+    - inventory_hostname in groups['master']
+    - install_option == "full" or install_option == "kubernetes"
+
+- name: Run rpm-install (master)
+  shell: >
+    /bin/bash -c "{{ rpm_path }}/run_accordion.sh"
+  args:
+    chdir: "{{ rpm_path }}"
+  when:
+    - inventory_hostname in groups['master']
+    - install_option == "accordion" or install_option == "diamanti"
+
+- name: Creates docker directory
+  file: path={{ docker_default_path }} state=directory
+  when: inventory_hostname in groups['master']
+  ignore_errors: yes
+  when:
+    - install_option == "full" or install_option == "kubernetes"
+
+- name: docker directory change1
+  shell: >
+    sed -i '/ExecStart/d' /lib/systemd/system/docker.service
+  when:
+    - install_option == "full" or install_option == "kubernetes"
+
+- name: docker directory change2
+  shell: >
+    sed -i '10a ExecStart=/usr/bin/dockerd -g {{ docker_default_path }}' /lib/systemd/system/docker.service
+  when:
+    - install_option == "full" or install_option == "kubernetes"
+
+- name: Reload systemd
+  command: systemctl daemon-reload
+  when:
+    - install_option == "full" or install_option == "kubernetes"
+
+- name: Start Docker service
+  service:
+    name: docker
+    state: started
+    enabled: yes
+  become: yes
+  when:
+    - install_option == "full" or install_option == "kubernetes"
+
+- name: "Mode 755 for docker_load.sh (master)"
+  file:
+    path: "{{ docker_path }}/docker_load.sh"
+    mode: 0755
+  when: 
+    - inventory_hostname in groups['master']
+    - install_option == "full"
+
+- name: "Mode 755 for docker_load_accordion.sh (master)"
+  file:
+    path: "{{ docker_path }}/docker_load_accordion.sh"
+    mode: 0755
+  when:
+    - inventory_hostname in groups['master']
+    - install_option == "accordion" or install_option == "diamanti"
+
+- name: "Mode 755 for docker_load_kubernetes.sh (master)"
+  file:
+    path: "{{ docker_path }}/docker_load_kubernetes.sh"
+    mode: 0755
+  when:
+    - inventory_hostname in groups['master']
+    - install_option == "kubernetes"
+
+- name: Run docker-install (master)
+  shell: >
+    /bin/sh -c "{{ docker_path }}/docker_load.sh"
+  args:
+    chdir: "{{ docker_path }}"
+  when: 
+    - inventory_hostname in groups['master']
+    - install_option == "full"    
+
+- name: Run docker-install (master)
+  shell: >
+    /bin/sh -c "{{ docker_path }}/docker_load_accordion.sh"
+  args:
+    chdir: "{{ docker_path }}"
+  when:
+    - inventory_hostname in groups['master']
+    - install_option == "accordion" or install_option == "diamanti"
+
+- name: Run docker-install (master)
+  shell: >
+    /bin/sh -c "{{ docker_path }}/docker_load_kubernetes.sh"
+  args:
+    chdir: "{{ docker_path }}"
+  when:
+    - inventory_hostname in groups['master']
+    - install_option == "kubernetes"
+
+- name: "Mode 755 for docker_load.sh"
+  file:
+    path: "/tmp/docker/docker_load.sh"
+    mode: 0755
+  when: 
+    - inventory_hostname in groups['minions'] or inventory_hostname in groups['infra'] or inventory_hostname in groups['backup-master']
+    - install_option == "full"
+
+- name: "Mode 755 for docker_load_accordion.sh"
+  file:
+    path: "/tmp/docker/docker_load_accordion.sh"
+    mode: 0755
+  when:
+    - inventory_hostname in groups['minions'] or inventory_hostname in groups['infra'] or inventory_hostname in groups['backup-master']
+    - install_option == "accordion" or install_option == "diamanti"
+
+- name: "Mode 755 for docker_load_kubernetes.sh"
+  file:
+    path: "/tmp/docker/docker_load_kubernetes.sh"
+    mode: 0755
+  when:
+    - inventory_hostname in groups['minions'] or inventory_hostname in groups['infra'] or inventory_hostname in groups['backup-master']
+    - install_option == "kubernetes"
+
+- name: Run docker-install (nodes)
+  shell: >
+    /bin/sh -c "/tmp/docker/docker_load.sh"
+  args:
+    chdir: "/tmp/docker"
+  when: 
+    - inventory_hostname in groups['minions'] or inventory_hostname in groups['infra'] or inventory_hostname in groups['backup-master']
+    - install_option == "full"
+
+- name: Run docker-install (nodes)
+  shell: >
+    /bin/sh -c "/tmp/docker/docker_load_accordion.sh"
+  args:
+    chdir: "/tmp/docker"
+  when:
+    - inventory_hostname in groups['minions'] or inventory_hostname in groups['infra'] or inventory_hostname in groups['backup-master']
+    - install_option == "accordion" or install_option == "diamanti"
+
+- name: Run docker-install (nodes)
+  shell: >
+    /bin/sh -c "/tmp/docker/docker_load_kubernetes.sh"
+  args:
+    chdir: "/tmp/docker"
+  when:
+    - inventory_hostname in groups['minions'] or inventory_hostname in groups['infra'] or inventory_hostname in groups['backup-master']
+    - install_option == "kubernetes"

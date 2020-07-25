@@ -1,0 +1,25 @@
+---
+######### Metric-server ####################################################################
+- name: Put {{ kube_addon_dir }}/influxdb/metrics-server.yaml file
+  template:
+    src: metrics-server.yaml.j2
+    dest: "{{ kube_addon_dir }}/influxdb/metrics-server.yaml"
+
+- name: Create the Metric-Server 
+  shell: >
+    kubectl create -f {{ kube_addon_dir }}/influxdb/metrics-server.yaml
+  ignore_errors: True
+
+######### Result #################################
+- name: list kubernetes' pods
+  shell: >
+    kubectl get pods --all-namespaces
+  changed_when: false
+  register: kubectl_get_pods
+  tags:
+    - output
+
+- name: print output of `kubectl get pods --all-namespaces`
+  debug: msg="{{ kubectl_get_pods.stdout_lines }}"
+  tags:
+    - output

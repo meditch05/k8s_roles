@@ -1,0 +1,92 @@
+---
+##################################################################################
+# Jenkins server
+##################################################################################
+- name: Create Jenkins directory
+  file: path={{ jenkins_nfs_path }} state=directory mode=0777
+  register: jenkins_dir
+  ignore_errors: yes
+
+- name: Create Jenkins addon directory
+  file: path={{ kube_addon_dir }}/jenkins state=directory mode=0777
+  register: jenkins_addon_dir
+  ignore_errors: yes
+
+######### Create the jenkins namespace ###########################################
+- name: Check the namespace
+  shell: "kubectl get namespaces | grep {{ jenkins_namespace }}"
+  delegate_to: "{{ groups['master'][0] }}"
+  run_once: true
+  register: check_namespace
+  ignore_errors: yes
+
+- name: Create a namespace for jenkins
+  when: check_namespace|failed
+  shell: >
+    kubectl create ns {{ jenkins_namespace }}
+  delegate_to: "{{ groups['master'][0] }}"
+  run_once: true
+  ignore_errors: yes
+
+######### PV #####################################################################
+- name: Put {{ kube_addon_dir }}/jenkins/jenkins-pv.yaml file
+  template:
+    src: jenkins-pv.yaml.j2
+    dest: "{{ kube_addon_dir }}/jenkins/jenkins-pv.yaml"
+  # when: inventory_hostname in groups['master']
+
+- name: Create a PV(Persistent Volume) for jenkins
+  shell: >
+    kubectl create -f {{ kube_addon_dir }}/jenkins/jenkins-pv.yaml
+  ignore_errors: yes
+
+######### PVC ####################################################################
+- name: Put {{ kube_addon_dir }}/jenkins/jenkins-pvc.yaml file
+  template:
+    src: jenkins-pvc.yaml.j2
+    dest: "{{ kube_addon_dir }}/jenkins/jenkins-pvc.yaml"
+  # when: inventory_hostname in groups['master']
+
+- name: Create a PVC(Persistent Volume Claim) for jenkins
+  shell: >
+    kubectl create -f {{ kube_addon_dir }}/jenkins/jenkins-pvc.yaml
+  ignore_errors: yes
+
+######### Deployment #############################################################
+- name: Put {{ kube_addon_dir }}/jenkins/jenkins-deploy.yaml file
+  template:
+    src: jenkins-deploy.yaml.j2
+    dest: "{{ kube_addon_dir }}/jenkins/jenkins-deploy.yaml"
+  # when: inventory_hostname in groups['master']
+
+- name: Deploy the jenkins server
+  shell: >
+    kubectl create -f {{ kube_addon_dir }}/jenkins/jenkins-deploy.yaml
+  # ignore_errors: yes
+
+######### Service ################################################################
+- name: Put {{ kube_addon_dir }}/jenkins/jenkins-service.yaml file
+  template:
+    src: jenkins-service.yaml.j2
+    dest: "{{ kube_addon_dir }}/jenkins/jenkins-service.yaml"
+  # when: inventory_hostname in groups['master']
+
+- name: Create a service for jenkins
+  shell: >
+    kubectl create -f {{ kube_addon_dir }}/jenkins/jenkins-service.yaml
+  # ignore_errors: yes
+  
+######### Result #################################################################
+- name: list kubernetes' pods
+  shell: >
+    kubectl get pods --all-namespaces
+  changed_when: false
+  register: kubectl_get_pods
+  tags:
+    - output
+
+- name: print output of `kubectl get pods --all-namespaces`
+  debug: msg="{{ kubectl_get_pods.stdout_lines }}"
+  tags:
+    - output
+

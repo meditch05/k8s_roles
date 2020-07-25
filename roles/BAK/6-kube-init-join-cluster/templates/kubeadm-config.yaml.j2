@@ -1,0 +1,62 @@
+apiVersion: kubeadm.k8s.io/v1alpha1
+kind: MasterConfiguration
+api:
+{% if loadbalancer_apiserver is defined and loadbalancer_apiserver == "true" %}
+  advertiseAddress: {{ apiserver_loadbalancer_vip }}
+{% endif %}
+{% if loadbalancer_apiserver is defined and loadbalancer_apiserver == "false" %}
+  advertiseAddress: {{ master_ip }}
+{% endif %}
+  bindPort: {{ kube_apiserver_port }}
+tokenTTL: "0"
+#etcd:
+#  caFile: /etc/kubernetes/pki/etcd/ca.crt
+#  certFile: /etc/kubernetes/pki/apiserver-etcd-client.crt
+#  keyFile: /etc/kubernetes/pki/apiserver-etcd-client.key
+networking:
+  serviceSubnet: {{ service_cidr }}
+  podSubnet: {{ pod_network_cidr }}
+kubernetesVersion: {{ kubernetes_version }}
+{% if cloud_provider is defined and cloud_provider != "gce" %}
+cloudProvider: {{ cloud_provider }}
+{% endif %}
+apiServerExtraArgs:
+  bind-address: {{ kube_apiserver_bind_address }}
+{% if kube_apiserver_enable_admission_plugins|length > 0 %}
+  enable-admission-plugins: {{ kube_apiserver_enable_admission_plugins | join(',') }} 
+{% endif %}
+{% if kube_apiserver_disable_admission_plugins|length > 0 %}
+  disable-admission-plugins: {{ kube_apiserver_disable_admission_plugins | join(',') }} 
+{% endif %}
+{% if  kubernetes_version >= "1.9" %}
+  endpoint-reconciler-type: lease
+{% endif %}
+  service-node-port-range: {{ kube_apiserver_node_port_range }}
+  kubelet-preferred-address-types: "{{ kubelet_preferred_address_types }}"
+  allow-privileged: "true"
+{% for key in kube_kubeadm_apiserver_extra_args %}
+  {{ key }}: "{{ kube_kubeadm_apiserver_extra_args[key] }}"
+{% endfor %}
+controllerManagerExtraArgs:
+  node-monitor-grace-period: {{ kube_controller_node_monitor_grace_period }}
+  node-monitor-period: {{ kube_controller_node_monitor_period }}
+  pod-eviction-timeout: {{ kube_controller_pod_eviction_timeout }}
+{% for key in kube_kubeadm_controller_extra_args %}
+  {{ key }}: "{{ kube_kubeadm_controller_extra_args[key] }}"
+{% endfor %}
+{% if kube_kubeadm_scheduler_extra_args|length > 0 %}
+schedulerExtraArgs:
+{% for key in kube_kubeadm_scheduler_extra_args %}
+  {{ key }}: "{{ kube_kubeadm_scheduler_extra_args[key] }}"
+{% endfor %}
+{% endif %}
+apiServerCertSANs:
+{% for san in  apiserver_sans.split(' ') | unique %}
+  - {{ san }}
+{% endfor %}
+{% if kube_override_hostname == 'true' %}
+nodeName: {{ master_host_name }}
+{% endif %}
+kubeletConfiguration:
+  baseConfig:
+    failSwapOn: false

@@ -1,0 +1,7 @@
+---
+# User user namespace for topology
+tar_path: "{{ playbook_dir }}/../tar_docker"
+namespace: accordion
+nodePort: 30071
+image_source: byouloh/cluster-insight:v2.0
+image: 127.0.0.1:{{ registry_nodePort }}/cluster-insight:v2.0

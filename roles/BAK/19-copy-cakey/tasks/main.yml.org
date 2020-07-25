@@ -1,0 +1,42 @@
+---
+- name: Copy /etc/kubernetes/config/admin.conf
+  synchronize:
+    src: /etc/kubernetes/admin.conf
+    dest: /etc/kubernetes/admin.conf
+  delegate_to: "{{ groups['master'][0] }}"
+  ignore_errors: True
+
+- name: Copy /etc/kubernetes/controller-manager.conf
+  synchronize:
+    src: /etc/kubernetes/controller-manager.conf
+    dest: /etc/kubernetes/controller-manager.conf
+  delegate_to: "{{ groups['master'][0] }}"
+  ignore_errors: True
+
+- name: Copy /etc/kubernetes/kubelet.con
+  synchronize:
+    src: /etc/kubernetes/kubelet.conf
+    dest: /etc/kubernetes/kubelet.conf
+  delegate_to: "{{ groups['master'][0] }}"
+  ignore_errors: True
+
+- name: Copy /etc/kubernetes/scheduler.conf
+  synchronize:
+    src: /etc/kubernetes/scheduler.conf
+    dest: /etc/kubernetes/scheduler.conf
+  delegate_to: "{{ groups['master'][0] }}"
+  ignore_errors: True
+
+- name: Copy /etc/kubernetes/pki
+  synchronize:
+    src: /etc/kubernetes/pki
+    dest: /etc/kubernetes/pki
+  delegate_to: "{{ groups['master'][0] }}"
+  ignore_errors: True
+
+- name: Copy /etc/kubernetes/config 
+  synchronize:
+    src: /root/.kube/config
+    dest: /root/.kube/config
+  delegate_to: "{{ groups['master'][0] }}"
+  ignore_errors: True

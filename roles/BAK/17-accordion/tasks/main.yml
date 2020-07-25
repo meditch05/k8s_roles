@@ -1,0 +1,240 @@
+---
+##################################################################################
+# Accordion & Postgres
+##################################################################################
+
+- name: Create heapster-role.yaml
+  shell: >
+    kubectl create clusterrolebinding heapster-on-cluster-admin   --clusterrole=cluster-admin   --serviceaccount=kube-system:heapster
+
+- name: Create system-default-role.yaml
+  shell: >
+    kubectl create clusterrolebinding system-add-on-cluster-admin   --clusterrole=cluster-admin   --serviceaccount=kube-system:default
+
+- name: Create topology-role.yaml
+  shell: >
+    kubectl create clusterrolebinding accordion-add-on-cluster-admin   --clusterrole=cluster-admin   --serviceaccount=accordion:default --group=accordion-add-on-cluster-admin
+
+#- name: Create metrics-role.yaml
+#  shell: >
+#    kubectl create clusterrolebinding metrics-add-on-cluster-admin --clusterrole=cluster-admin --user=system:anonymous --serviceaccount=system:metrics-server
+    
+- name: Create jenkins-role.yaml
+  shell: >
+    kubectl create clusterrolebinding jenkins-add-on-cluster-admin   --clusterrole=cluster-admin   --serviceaccount=jenkins:default
+
+#- name: Create permissive-role.yaml (The following policy allows ALL service accounts to act as cluster administrators)
+#  shell: >
+#    kubectl create clusterrolebinding permissive-binding --clusterrole=cluster-admin --user=admin --user=kubelet --group=system:serviceaccounts
+
+- name: accordion addon directory
+  file: path={{ kube_addon_dir }}/accordion state=directory
+  register: default_addon_dir
+  ignore_errors: True
+
+- name: Postgres directory
+  file: path={{ accordion_nfs_path }}/pgdata state=directory mode=0777
+  register: postgres_dir
+  ignore_errors: True
+
+- name: Scouter directory
+  file: path={{ accordion_nfs_path }}/monitoring-data state=directory mode=0777
+  register: scouter_dir
+  ignore_errors: True
+
+## Postgres
+- name: Put {{ kube_addon_dir }}/accordion/pgdata-pv.yaml file
+  template:
+    src: pgdata-pv.yaml.j2
+    dest: "{{ kube_addon_dir }}/accordion/pgdata-pv.yaml"
+  # when: inventory_hostname in groups['master']
+
+- name: Deploy postgres-deploy-svc.yaml
+  shell: >
+    kubectl apply -f {{ kube_addon_dir }}/accordion/pgdata-pv.yaml
+
+- name: Put {{ kube_addon_dir }}/accordion/pgdata-pvc.yaml file
+  template:
+    src: pgdata-pvc.yaml.j2
+    dest: "{{ kube_addon_dir }}/accordion/pgdata-pvc.yaml"
+  # when: inventory_hostname in groups['master']
+
+- name: Deploy postgres-deploy-svc.yaml
+  shell: >
+    kubectl apply -f {{ kube_addon_dir }}/accordion/pgdata-pvc.yaml
+
+- name: Put {{ kube_addon_dir }}/accordion/postgres-deploy-svc.yaml file
+  template:
+    src: postgres-deploy-svc.yaml.j2
+    dest: "{{ kube_addon_dir }}/accordion/postgres-deploy-svc.yaml"
+  # when: inventory_hostname in groups['master']
+
+- name: Deploy postgres-deploy-svc.yaml
+  shell: >
+    kubectl apply -f {{ kube_addon_dir }}/accordion/postgres-deploy-svc.yaml
+
+## Accordion
+- name: Accordion directory
+  file: path={{ accordion_nfs_path }}/accordion state=directory mode=0777
+  register: accordion_dir
+  ignore_errors: True
+
+- name: Accordion directory
+  file: path={{ accordion_nfs_path }}/accordion/license state=directory mode=0777
+  register: accordion_license_dir
+  ignore_errors: True
+
+- name: Accordion directory
+  file: path={{ accordion_nfs_path }}/accordion/config state=directory mode=0777
+  register: accordion_config_dir
+  ignore_errors: True
+
+- name: Accordion directory
+  file: path={{ accordion_nfs_path }}/accordion/templates state=directory mode=0777
+  register: accordion_templates_dir
+  ignore_errors: True
+
+- name: Put {{ kube_addon_dir }}/accordion/nfs-conf.yaml file
+  template:
+    src: nfs-conf.yaml.j2
+    dest: "{{ kube_addon_dir }}/accordion/nfs-conf.yaml"
+  # when: inventory_hostname in groups['master']
+  
+- name: Create a Configuation for NFS
+  shell: >
+    kubectl apply -f {{ kube_addon_dir }}/accordion/nfs-conf.yaml
+
+- name: Put {{ kube_addon_dir }}/accordion/accordion-config-pv.yaml file
+  template:
+    src: accordion-config-pv.yaml.j2
+    dest: "{{ kube_addon_dir }}/accordion/accordion-config-pv.yaml"
+
+- name: Deploy accordion-config-pv
+  shell: >
+    kubectl apply -f {{ kube_addon_dir }}/accordion/accordion-config-pv.yaml
+
+- name: Put {{ kube_addon_dir }}/accordion/accordion-config-pvc.yaml file
+  template:
+    src: accordion-config-pvc.yaml.j2
+    dest: "{{ kube_addon_dir }}/accordion/accordion-config-pvc.yaml"
+
+- name: Deploy accordion-config-pvc
+  shell: >
+    kubectl apply -f {{ kube_addon_dir }}/accordion/accordion-config-pvc.yaml
+
+- name: Put {{ kube_addon_dir }}/accordion/accordion-license-pv.yaml file
+  template:
+    src: accordion-license-pv.yaml.j2
+    dest: "{{ kube_addon_dir }}/accordion/accordion-license-pv.yaml"
+
+- name: Deploy accordion-license-pv
+  shell: >
+    kubectl apply -f {{ kube_addon_dir }}/accordion/accordion-license-pv.yaml
+
+- name: Put {{ kube_addon_dir }}/accordion/accordion-license-pvc.yaml file
+  template:
+    src: accordion-license-pvc.yaml.j2
+    dest: "{{ kube_addon_dir }}/accordion/accordion-license-pvc.yaml"
+
+- name: Deploy accordion-license-pvc.yaml
+  shell: >
+    kubectl apply -f {{ kube_addon_dir }}/accordion/accordion-license-pvc.yaml
+
+- name: Put {{ kube_addon_dir }}/accordion/accordion-templates-pv.yaml file
+  template:
+    src: accordion-templates-pv.yaml.j2
+    dest: "{{ kube_addon_dir }}/accordion/accordion-templates-pv.yaml"
+
+- name: Deploy accordion-templates-pv
+  shell: >
+    kubectl apply -f {{ kube_addon_dir }}/accordion/accordion-templates-pv.yaml
+
+- name: Put {{ kube_addon_dir }}/accordion/accordion-templates-pvc.yaml file
+  template:
+    src: accordion-templates-pvc.yaml.j2
+    dest: "{{ kube_addon_dir }}/accordion/accordion-templates-pvc.yaml"
+
+- name: Deploy accordion-templates-pvc.yaml
+  shell: >
+    kubectl apply -f {{ kube_addon_dir }}/accordion/accordion-templates-pvc.yaml
+
+- name: Put {{ kube_addon_dir }}/accordion/accordion-docker-registry.yaml file
+  template:
+    src: accordion-docker-registry.yaml.j2
+    dest: "{{ kube_addon_dir }}/accordion/accordion-docker-registry.yaml"
+
+- name: Create accordion-docker-registry
+  shell: >
+    kubectl create -f {{ kube_addon_dir }}/accordion/accordion-docker-registry.yaml
+
+#- name: Put {{ kube_addon_dir }}/accordion/accordion-kube-pv-pvc.yaml file
+#  template:
+#    src: accordion-kube-pv-pvc.yaml.j2
+#    dest: "{{ kube_addon_dir }}/accordion/accordion-kube-pv-pvc.yaml"
+
+#- name: Deploy accordion-kube-pv-pvc.yaml
+#  shell: >
+#    kubectl apply -f {{ kube_addon_dir }}/accordion/accordion-kube-pv-pvc.yaml
+
+- name: Put accordion-deploy-svc.yaml
+  template:
+    src: accordion-deploy-svc.yaml.j2
+    dest: "{{ kube_addon_dir }}/accordion/accordion-deploy-svc.yaml"
+
+- name: Deploy accordion-deploy-svc.yaml
+  shell: >
+    kubectl apply -f {{ kube_addon_dir }}/accordion/accordion-deploy-svc.yaml
+
+- name: Copy system-default-template.yaml file
+  copy:
+    src: system-default-template.yaml
+    dest: "{{ kube_addon_dir }}/accordion/system-default-template.yaml"
+
+- name: default template
+  shell: >
+    kubectl apply -f {{ kube_addon_dir }}/accordion/system-default-template.yaml -n accordion
+
+- name: create maven repository
+  file: path={{ accordion_nfs_path }}/jenkins/.m2 state=directory mode=0777
+  ignore_errors: True
+
+- name: create jenkins workspace
+  file: path={{ accordion_nfs_path }}/jenkins/workspace state=directory mode=0777
+  ignore_errors: True
+    
+- name: Copy accordion shell command
+  copy:
+    src: accordion
+    dest: /usr/local/bin/accordion
+    mode: 0744
+  ignore_errors: True
+  
+- name: Copy ac_qr_check shell command
+  copy:
+    src: ac_qr_check
+    dest: /usr/local/bin/ac_qr_check
+    mode: 0744
+  ignore_errors: True
+  
+- name: Copy ac_server_check.sh shell command
+  copy:
+    src: ac_server_check.sh
+    dest: /usr/local/bin/ac_server_check.sh
+    mode: 0744
+  ignore_errors: True
+
+######### Result #################################
+- name: list kubernetes' pods
+  shell: >
+    kubectl get pods --all-namespaces
+  # when: inventory_hostname in groups['master'][0]
+  changed_when: false
+  register: kubectl_get_pods
+  tags:
+    - output
+
+- name: print output of `kubectl get pods --all-namespaces`
+  debug: msg="{{ kubectl_get_pods.stdout_lines }}"
+  # when: inventory_hostname in groups['master'][0]
+  tags:
+    - output

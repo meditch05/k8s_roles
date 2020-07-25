@@ -1,0 +1,86 @@
+---
+##################################################################################
+# Install GPU Monitoring
+##################################################################################
+
+- name: Copy GPU Install file(gpu.tar)
+  copy:
+    src: gpu.tar
+    dest: "{{ kube_addon_dir }}/gpu/"
+
+- name: extract archive
+  unarchive: src={{ kube_addon_dir }}/gpu/gpu.tar dest={{ kube_addon_dir }}/gpu/
+
+- name: Deploy Prometheus
+  shell: >
+    kubectl apply -f {{ kube_addon_dir }}/gpu/prometheus
+  ignore_errors: True
+
+- name: "Mode 755 for ca.sh"
+  file:
+    path: "{{ kube_addon_dir }}/gpu/custom-meterics/ca.sh"
+    mode: 0755
+
+- name: Run ca.sh 
+  shell: >
+    /bin/sh -c "{{ kube_addon_dir }}/gpu/custom-meterics/ca.sh"
+  ignore_errors: True
+
+- name: Deploy custom-meterics
+  shell: >
+    kubectl apply -f {{ kube_addon_dir }}/gpu/custom-meterics/manifests
+
+- name: Deploy dcgm
+  shell: >
+    kubectl apply -f {{ kube_addon_dir }}/gpu/dcgm
+  ignore_errors: True
+
+- name: "Mode 755 for ca.sh"
+  file:
+    path: "{{ kube_addon_dir }}/gpu/insert_label.sh"
+    mode: 0755
+
+- wait_for:
+    host: 127.0.0.1
+    port: 9100
+    delay: 10    
+
+- name: label insert
+  shell: >
+    /bin/sh -c "{{ kube_addon_dir }}/gpu/insert_label.sh"
+  register: insert_label
+  tags:
+    - output
+
+- name: print output of `insert_label.sh`
+  debug: msg="{{ insert_label.stdout_lines }}"
+  tags:
+    - output
+
+######### Result #################################
+- name: list kubernetes' pods
+  shell: >
+    kubectl get pods --all-namespaces
+  changed_when: false
+  register: kubectl_get_pods
+  tags:
+    - output
+
+- name: print output of `kubectl get pods --all-namespaces`
+  debug: msg="{{ kubectl_get_pods.stdout_lines }}"
+  tags:
+    - output
+
+- name: print output label
+  shell: >
+    kubectl get nodes --show-labels
+  changed_when: false
+  register: kubectl_get_labels
+  tags:
+    - output
+
+- name: print output of `kubectl get nodes --show-labels`
+  debug: msg="{{ kubectl_get_labels.stdout_lines }}"
+  tags:
+    - output
+

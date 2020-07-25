@@ -1,0 +1,11 @@
+---
+- name: Add group
+  shell: >
+    groupadd accordion -g 1001001
+  ignore_errors: True
+
+- name: Add user
+  shell: >
+    useradd accordion -d /home/accordion -s /bin/bash -u 1001001 -g 1001001
+  ignore_errors: True
+    

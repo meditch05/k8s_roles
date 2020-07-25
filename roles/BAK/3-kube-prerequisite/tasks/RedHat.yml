@@ -1,0 +1,34 @@
+---
+#- hostname: name={{ inventory_hostname }}
+#  become: yes
+
+- name: Disable and stop firewalld
+  service: name=firewalld state=stopped enabled=no
+  ignore_errors: yes
+
+- name: Remove swapfile from /etc/fstab
+  mount:
+    name: swap
+    fstype: swap
+    state: absent
+
+- name: Turn swap off
+  shell: swapoff -a
+
+#- name: Ensure the required packages are installed.
+#  yum: name=ntp state=latest
+
+- name: Set timezone to {{ timezone }}
+  timezone: name={{ timezone }}
+
+#- name: Enable and Start ntpd
+#  service: name=ntpd state=restarted enabled=yes
+
+# - name: Installing the epel repository on CentOS 7 / RHEL 7
+#   shell: "rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
+
+#- name: Upgrade all packages
+#  yum: name='*' state=latest
+
+- name: Copy 00-system.conf
+  copy: src=00-system.conf dest=/usr/lib/sysctl.d/00-system.conf

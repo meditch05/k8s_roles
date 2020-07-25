@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    app.kubernetes.io/component: zookeeper
+    app.kubernetes.io/instance: kafka
+    app.kubernetes.io/name: zookeeper
+  name: data-kafka-zookeeper-0
+  namespace: infra
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 8Gi
+  storageClassName: nfs-client
+  volumeMode: Filesystem

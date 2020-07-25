@@ -1,0 +1,118 @@
+---
+######### Api Server Health Check ######################
+- wait_for:
+    host: 127.0.0.1
+    port: "{{ kube_apiserver_port }}"
+    delay: 10
+
+# Set up Weave Kube on top of Kubernetes.
+
+# - name: set url for weave-kube daemonset
+#   set_fact:
+#     weave_kube_url: '{{ (kubernetes_version < "1.6") | ternary("https://git.io/weave-kube", "https://git.io/weave-kube-1.6") }}'
+
+# - name: optionally set kubeconfig option
+#   set_fact:
+#     kubeconfig: '{{ (kubernetes_version >= "1.5.4") | ternary("--kubeconfig /etc/kubernetes/admin.conf", "") }}'
+#     kubernetes_version_option: '{{ (kubernetes_version >= "1.6") | ternary("kubernetes_version", "use-kubernetes-version") }}'
+    
+# - name: configure weave net's cni plugin
+#   command: 'kubectl {{ kubeconfig }} apply -f {{ weave_kube_url }}'
+
+########## Weave #############
+- name: configure weave net's cni plugin
+  shell: >
+    sysctl net.bridge.bridge-nf-call-iptables=1
+  when:
+    - network_cni == 'weave'
+
+#- name: configure weave net's cni plugin
+#  shell: >
+#    kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
+#  when:
+#    - network_cni == 'weave'
+
+- name: default addon directory
+  file: path={{ kube_addon_dir }}/weave state=directory
+  register: default_addon_dir
+  ignore_errors: True
+  when:
+    - network_cni == 'weave'
+
+- name: Copy weave.yaml file
+  template: src=weave.yaml.j2 dest={{ kube_addon_dir }}/weave/weave.yaml
+  when:
+    - network_cni == 'weave'
+
+- name: configure weave net's cni plugin
+  shell: >
+    kubectl apply -f {{ kube_addon_dir }}/weave/weave.yaml
+  when:
+    - network_cni == 'weave'
+
+- name: create /etc/cni/net.d
+  file: path=/etc/cni/net.d state=directory
+  ignore_errors: True
+  when:
+    - network_cni == 'weave'
+
+- name: Copy 10-weave.conflist file
+  template: src=10-weave.conflist.j2 dest=/etc/cni/net.d/10-weave.conflist
+  when:
+    - network_cni == 'weave'
+
+########## Calico #############
+- name: default addon directory
+  file: path={{ kube_addon_dir }}/calico state=directory
+  register: default_addon_dir
+  ignore_errors: True
+  when:
+    - network_cni == 'calico'
+
+- name: Copy rbac-kdd.yaml file
+  copy:
+    src: rbac-kdd.yaml
+    dest: "{{ kube_addon_dir }}/calico/rbac-kdd.yaml"
+  when:
+    - network_cni == 'calico'
+
+- name: Copy calico.yaml file
+  copy:
+    src: calico.yaml
+    dest: "{{ kube_addon_dir }}/calico/calico.yaml"
+  when:
+    - network_cni == 'calico'
+
+- name: configure calico net's cni plugin
+  shell: >
+    kubectl apply -f {{ kube_addon_dir }}/calico/rbac-kdd.yaml
+  when:
+    - network_cni == 'calico'
+
+- name: configure calico net's cni plugin
+  shell: >
+    kubectl apply -f {{ kube_addon_dir }}/calico/calico.yaml
+  when:
+    - network_cni == 'calico'
+
+######### Result #################################
+- name: list kubernetes' pods
+  shell: >
+    kubectl get pods --all-namespaces
+  changed_when: false
+  register: kubectl_get_pods
+  tags:
+    - output
+
+- name: print output of `kubectl get pods --all-namespaces`
+  debug: msg="{{ kubectl_get_pods.stdout_lines }}"
+  tags:
+    - output
+
+- name: Restart kubelet
+  service:
+    name: "{{ item }}"
+    state: restarted
+    enabled: yes
+  with_items:
+    - kubelet

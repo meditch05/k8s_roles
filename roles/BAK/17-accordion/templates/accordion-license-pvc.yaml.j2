@@ -1,0 +1,14 @@
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: accordion-license-pvc
+  namespace: {{ namespace }} 
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Mi
+  selector:
+    matchLabels:
+      volume-task: accordion-license

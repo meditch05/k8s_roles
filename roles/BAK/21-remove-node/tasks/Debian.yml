@@ -1,0 +1,83 @@
+---
+- name: reset nodes
+  shell: "kubeadm reset"
+  when:
+    - kubernetes_version | search('1.9')
+    - inventory_hostname in groups['minions'] or inventory_hostname in groups['infra']
+  register: kubeadm_reset_command
+  tags:
+    - output
+
+- name: reset nodes
+  shell: "kubeadm reset"
+  when:
+    - kubernetes_version | search('1.10')
+    - inventory_hostname in groups['minions'] or inventory_hostname in groups['infra']
+  register: kubeadm_reset_command
+  tags:
+    - output
+
+- name: reset nodes
+  shell: "kubeadm reset -f"
+  when:
+    - kubernetes_version | search('1.11')
+    - inventory_hostname in groups['minions'] or inventory_hostname in groups['infra']
+  register: kubeadm_reset_command
+  tags:
+    - output
+
+- name: Remove all semaphores
+  file:
+    dest: "{{ item }}"
+    state: absent
+  with_items:
+    - "/etc/.kubeadm-complete"
+    - "/etc/.kubeadm-joined"
+  when: inventory_hostname in groups['minions'] or inventory_hostname in groups['infra']
+
+- name: Remove nfs-utils1
+  apt: name=nfs-common state=absent
+  ignore_errors: True
+
+- name: Remove nfs-utils2
+  apt: name=nfs-kernel-server state=absent
+  ignore_errors: True
+
+- name: delete exports line
+  shell: >
+    sed -i '/{{ hostvars[inventory_hostname].ansible_host }}/d' /etc/exports
+
+- name: Remove kubectl
+  #apt: name=kubectl-{{ kubernetes_version }}-0.x86_64 state=absent
+  command: rm -rf /usr/bin/kubectl
+  ignore_errors: True
+
+- name: Remove kubelet
+  #apt: name=kubelet-{{ kubernetes_version }}-0.x86_64 state=absent
+  command: rm -rf /usr/bin/kubelet
+  ignore_errors: True
+
+- name: Remove kubeadm
+  #apt: name=kubeadm-{{ kubernetes_version }}-0.x86_64 state=absent
+  command: rm -rf /usr/bin/kubeadm
+  ignore_errors: True
+
+- name: Remove kubernetes-cni
+  apt: name=kubernetes-cni state=absent
+  ignore_errors: True
+
+- name: remove docker
+  apt:
+    name: "{{ item }}"
+    state: absent
+  with_items:
+    - docker
+    - docker-common
+    - docker-selinux
+    - docker-engine
+    - container-selinux
+  ignore_errors: True
+
+- name: Restart rpcbind
+  service: name=rpcbind state=restarted
+  when: inventory_hostname in groups['minions'] or inventory_hostname in groups['infra']

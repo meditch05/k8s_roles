@@ -1,0 +1,97 @@
+---
+- name: remove docker
+  yum:
+    name: "{{ item }}"
+    state: absent
+  with_items:
+    - docker
+    - docker-common
+    - docker-selinux
+    - docker-engine
+    - container-selinux
+  when: 
+    - install_mode == "online"
+
+#- name: Get pip
+#  shell: curl https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py
+#
+#- name: Install pip
+#  shell: python /tmp/get-pip.py
+#
+#- name: Install python setup tools
+#  yum: name=python-setuptools
+#  when:
+#    - install_mode == "online"
+#
+#- name: Install Pypi
+#  easy_install: name=pip
+#  when:
+#    - install_mode == "online"
+#
+#- name: Install docker-py module.
+#  shell: /usr/bin/pip install --ignore-installed docker-py
+#  when: 
+#    - install_mode == "online"
+#
+#- name: Install docker container engine package
+#  yum: name=docker state=latest
+#
+#- name: Put /etc/sysconfig/docker file.
+#  template: src=docker.j2 dest=/etc/sysconfig/docker 
+
+- name: Add Docker repo
+  get_url:
+    url: https://download.docker.com/linux/centos/docker-ce.repo
+    dest: /etc/yum.repos.d/docer-ce.repo
+  become: yes
+  when: 
+    - install_mode == "online"
+
+# yum search --showduplicates docker-ce
+
+- name: Install Docker
+  shell: >
+    yum install -y --setopt=obsoletes=0 {{ docker_version }}
+  when: 
+    - install_mode == "online"
+
+#- name: Install docker-ce
+#  yum:
+#    name: docker-ce-{{ docker_version }}.ce-3.el7
+#    state: latest
+
+- name: Start and Enable Docker
+  service: name=docker state=started enabled=yes
+
+#- name: Creates docker directory
+#  file: path={{ docker_default_path }} state=directory
+#  when: inventory_hostname in groups['master']
+#  ignore_errors: yes
+#
+#- name: docker directory change1
+#  shell: >
+#    sed -i '/ExecStart/d' /lib/systemd/system/docker.service
+#
+#- name: docker directory change2
+#  shell: >
+#    sed -i '10a ExecStart=/usr/bin/dockerd -g {{ docker_default_path }}' /lib/systemd/system/docker.service
+
+- name: Set alias dll, with no duplicated
+  copy:
+    src: .bash_profile
+    dest: /root/.bash_profile
+  when:
+    - inventory_hostname in groups['all']
+
+###########################
+# docker info ( at all cluster )
+###########################
+#  Insecure Registries:
+#    myregistry.mwportal.com:30001
+#    127.0.0.0/8
+
+- name: Reload systemd
+  command: systemctl daemon-reload
+
+- name: Start Docker service
+  shell: "systemctl enable docker && systemctl start docker"

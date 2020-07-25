@@ -1,0 +1,8 @@
+---
+# User user namespace for elasticsearch server
+namespace: kube-system
+# Decide the size of Storage(Gi)
+storage: "{{ elasticsearch_storage }}"
+# FIXME: use the right IP
+server: "{{ master_ip }}"
+path: "{{ accordion_nfs_path }}/elasticsearch"

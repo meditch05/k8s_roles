@@ -1,0 +1,10 @@
+# User user namespace for jenkins server
+namespace: jenkins
+# Decide the size of Storage(Gi)
+storage: "{{ jenkins_storage }}"
+# FIXME: use the right IP
+server: "{{ master_ip }}"
+path: "{{ accordion_nfs_path }}/jenkins"
+nodePort: 30002
+image: 127.0.0.1:{{ registry_nodePort }}/jenkins
+host: jenkins.accordion.com

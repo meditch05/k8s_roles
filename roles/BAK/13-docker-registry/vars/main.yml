@@ -1,0 +1,9 @@
+# User user namespace for registry
+namespace: accordion
+# Decide the size of Storage(Gi)
+storage: "{{ registry_storage }}"
+# FIXME: use the right IP
+server: "{{ master_ip }}"
+path: "{{ accordion_nfs_path }}/docker-registry"
+nodePort: "{{ registry_nodePort }}"
+image: registry:2.5.1

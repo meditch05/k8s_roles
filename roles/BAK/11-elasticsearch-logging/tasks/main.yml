@@ -1,0 +1,74 @@
+---
+##################################################################################
+# Elasticsearch logging
+##################################################################################
+- name: elk addon directory
+  file: path={{ kube_addon_dir }}/elk state=directory
+  register: elk_addon_dir
+  ignore_errors: True
+
+- name: influxdb directory
+  file: path={{ accordion_nfs_path }}/elasticsearch state=directory mode=0777
+  register: influxdb_dir
+  ignore_errors: True
+
+######### PV #####################################################################
+- name: Put {{ kube_addon_dir }}/elk/elasticsearch-pv.yaml file
+  template:
+    src: elasticsearch-pv.yaml.j2
+    dest: "{{ kube_addon_dir }}/elk/elasticsearch-pv.yaml"
+  # when: inventory_hostname in groups['master']
+
+- name: Create a PV(Persistent Volume) for elasticsearch
+  shell: >
+    kubectl create -f {{ kube_addon_dir }}/elk/elasticsearch-pv.yaml
+  # ignore_errors: True
+
+######### PVC ####################################################################
+- name: Put {{ kube_addon_dir }}/elk/elasticsearch-pvc.yaml file
+  template:
+    src: elasticsearch-pvc.yaml.j2
+    dest: "{{ kube_addon_dir }}/elk/elasticsearch-pvc.yaml"
+  # when: inventory_hostname in groups['master']
+
+- name: Create a PVC(Persistent Volume Claim) for elasticsearch
+  shell: >
+    kubectl create -f {{ kube_addon_dir }}/elk/elasticsearch-pvc.yaml
+  # ignore_errors: True
+
+
+######### Elasticsearch ####################################################################
+- name: Copy elasticsearch-role.yaml file
+  copy:
+    src: elasticsearch-role.yaml
+    dest: "{{ kube_addon_dir }}/elk/elasticsearch-role.yaml"
+
+- name: configure elk
+  shell: >
+    kubectl apply -f "{{ kube_addon_dir }}"/elk/elasticsearch-role.yaml
+
+- name: Copy elasticsearch-rc-svc.yaml file
+  template:
+    src: elasticsearch-rc-svc.yaml.j2
+    dest: "{{ kube_addon_dir }}/elk/elasticsearch-rc-svc.yaml"
+  # when: inventory_hostname in groups['master']
+
+- name: configure elk
+  shell: >
+    kubectl apply -f "{{ kube_addon_dir }}"/elk/elasticsearch-rc-svc.yaml
+  # when: inventory_hostname in groups['master'][0]
+######### Result #################################
+- name: list kubernetes' pods
+  shell: >
+    kubectl get pods --all-namespaces
+  # when: inventory_hostname in groups['master'][0]
+  changed_when: false
+  register: kubectl_get_pods
+  tags:
+    - output
+
+- name: print output of `kubectl get pods --all-namespaces`
+  debug: msg="{{ kubectl_get_pods.stdout_lines }}"
+  # when: inventory_hostname in groups['master'][0]
+  tags:
+    - output

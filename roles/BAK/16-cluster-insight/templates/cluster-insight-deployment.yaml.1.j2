@@ -1,0 +1,26 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+ name: topology-cluster-insight
+ namespace: {{ namespace }}
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: cluster-insight
+        version: v2
+    spec:
+      containers:
+        - name: cluster-insight
+          image: {{ image }}
+          ports:
+            - name: cluster-insight
+              containerPort: 5555
+          volumeMounts:
+          - name: timezone
+            mountPath: /etc/localtime
+      volumes:
+      - name: timezone
+        hostPath:
+          path: /etc/localtime

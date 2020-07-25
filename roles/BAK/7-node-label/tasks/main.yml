@@ -1,0 +1,25 @@
+---
+- name: create node label
+  command: 'kubectl label nodes {{ inventory_hostname }} accordion-role={{ node_role }}'
+  delegate_to: "{{ groups['master'][0] }}"
+  when: 
+    - inventory_hostname in groups['minions']
+    - node_role != "infra"
+  ignore_errors: yes
+
+- name: create node label
+  command: 'kubectl label nodes {{ inventory_hostname }} accordion-role=infra'
+  delegate_to: "{{ groups['master'][0] }}"
+  when: inventory_hostname in groups['infra']
+  ignore_errors: yes
+
+#- name: node taint
+#  command: 'kubectl taint nodes {{ inventory_hostname }} kubernetes.io/hostname={{ inventory_hostname }}:NoSchedule'
+#  command: 'kubectl taint nodes {{ inventory_hostname }} accordion-role=infra:NoSchedule'
+#  delegate_to: "{{ groups['master'][0] }}"
+#  when: inventory_hostname in groups['infra']
+#  ignore_errors: yes
+
+- wait_for:
+    port: 6783
+    delay: 15

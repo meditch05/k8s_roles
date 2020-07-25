@@ -1,0 +1,56 @@
+---
+######### Create the cluster-insight namespace #####################################
+#- name: Check the infra namespace
+#  shell: "kubectl get namespaces | grep {{ docker_namespace }}"
+#  delegate_to: "{{ groups['master'][0] }}"
+#  run_once: true
+#  register: check_namespace
+#  ignore_errors: true
+
+#- name: Create the namespace
+#  when: check_namespace|failed
+#  shell: >
+#    kubectl create ns {{ docker_namespace }}
+#  delegate_to: "{{ groups['master'][0] }}"
+#  run_once: true
+#  ignore_errors: true
+
+- name: Create the namespace ( -n infra )
+  shell: >
+    kubectl create ns {{ docker_namespace }}
+  ignore_errors: true
+
+- name: Create the namespace
+  shell: >
+    kubectl create ns {{ jenkins_namespace }}
+  ignore_errors: true
+
+- name: Create the namespace ( -n monitoring )
+  shell: >
+    kubectl create ns {{ prometheus_namespace }}
+  ignore_errors: true
+
+- name: Create the namespace 
+  shell: >
+    kubectl create ns {{ grafana_namespace }}
+  ignore_errors: true
+
+#- name: Create the namespace 
+#  shell: >
+#    kubectl create ns {{ elk_namespace }}
+#  ignore_errors: true
+
+
+######### Result #################################
+- name: list kubernetes' namespaces
+  shell: >
+    kubectl get ns
+  register: kubectl_get_ns
+  tags:
+    - output
+
+- name: print output of `kubectl get ns`
+  debug: msg="{{ kubectl_get_ns.stdout_lines }}"
+  # when: inventory_hostname in groups['master'][0]
+  tags:
+    - output

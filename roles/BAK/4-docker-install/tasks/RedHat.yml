@@ -1,0 +1,109 @@
+---
+- name: remove docker
+  yum:
+    name: "{{ item }}"
+    state: absent
+  with_items:
+    - docker
+    - docker-common
+    - docker-selinux
+    - docker-engine
+    - container-selinux
+  when: 
+    - install_mode == "online"
+
+- name: Install python setup tools
+  yum: name=python-setuptools
+  when: 
+    - install_mode == "online"
+
+- name: Install Pypi
+  easy_install: name=pip
+  when: 
+    - install_mode == "online"
+
+- name: Install docker-py module.
+  shell: /usr/bin/pip install --ignore-installed docker-py
+  when: 
+    - install_mode == "online"
+
+#- name: Install docker container engine package
+#  yum: name=docker state=latest
+
+#- name: Put /etc/sysconfig/docker file.
+#  template: src=docker.j2 dest=/etc/sysconfig/docker 
+
+#- name: Start and Enable Docker
+#  service: name=docker state=started enabled=yes
+
+- name: Install yum-utils
+  yum:
+    name: yum-utils
+    state: latest
+  when: 
+    - install_mode == "online"
+
+- name: Install policycoreutils-python
+  yum:
+    name: policycoreutils-python
+    state: latest
+  when: 
+    - install_mode == "online"
+
+- name: Install device-mapper-persistent-data
+  yum:
+    name: device-mapper-persistent-data
+    state: latest
+  when: 
+    - install_mode == "online"
+
+- name: Install lvm2
+  yum:
+    name: lvm2
+    state: latest
+  when: 
+    - install_mode == "online"
+
+- name: Add Docker repo
+  get_url:
+    url: https://download.docker.com/linux/centos/docker-ce.repo
+    dest: /etc/yum.repos.d/docer-ce.repo
+  become: yes
+  when: 
+    - install_mode == "online"
+
+#- name: Install Docker
+#  package:
+#    name: docker-ce-{{ docker_version }}
+#    state: installed
+#  become: yes
+
+- name: Install Docker
+  shell: |
+    yum install -y --setopt=obsoletes=0 \
+    {{ docker_version }}
+  when: 
+    - install_mode == "online"
+
+- name: Creates docker directory
+  file: path={{ docker_default_path }} state=directory
+  when: inventory_hostname in groups['master']
+  ignore_errors: yes
+
+- name: docker directory change1
+  shell: >
+    sed -i '/ExecStart/d' /lib/systemd/system/docker.service
+
+- name: docker directory change2
+  shell: >
+    sed -i '10a ExecStart=/usr/bin/dockerd -g {{ docker_default_path }}' /lib/systemd/system/docker.service
+
+- name: Reload systemd
+  command: systemctl daemon-reload
+
+- name: Start Docker service
+  service:
+    name: docker
+    state: started
+    enabled: yes
+  become: yes

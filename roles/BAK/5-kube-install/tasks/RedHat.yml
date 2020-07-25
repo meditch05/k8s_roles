@@ -1,0 +1,104 @@
+---
+- name: Template kube RPM repo
+  template:
+    src: kubernetes.repo.j2
+    dest: /etc/yum.repos.d/kubernetes.repo
+  when: 
+    - install_mode == "online"
+
+- name: Install required packages
+  shell: >
+    sudo yum -y install \
+      yum-versionlock \
+      kubectl-{{ kubernetes_version }}-0.x86_64 \
+      kubelet-{{ kubernetes_version }}-0.x86_64 \
+      kubeadm-{{ kubernetes_version }}-0.x86_64 \
+      kubernetes-cni-0.6.0-0.x86_64
+  when: 
+    - install_mode == "online"
+
+- name: Lock versions
+  shell: >
+    #sudo yum versionlock add kubectl kubelet kubeadm
+    sudo yum versionlock add kubectl kubelet kubeadm kubernetes-cni docker
+
+- name: Set bridge-nf-call-iptables to 1
+  shell: >
+    echo "1" > /proc/sys/net/bridge/bridge-nf-call-iptables
+
+- name: Set bridge-nf-call-ip6tables to 1
+  shell: >
+    echo "1" > /proc/sys/net/bridge/bridge-nf-call-ip6tables
+
+- name: Template kubeadm 1.10
+  template:
+    src: 10-kubeadm-1.10.j2
+    dest: /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+  when: 
+    - inventory_hostname in groups['master']
+    - kubernetes_version | search('1.10')
+    
+- name: Template kubeadm 1.10 (backup)
+  template:
+    src: 10-kubeadm-1.10-backup.j2
+    dest: /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+  when: 
+    - inventory_hostname in groups['backup-master'] or inventory_hostname in groups['minions'] or inventory_hostname in groups['infra']
+    - kubernetes_version | search('1.10')
+    
+- name: Template kubeadm 1.11
+  template:
+    src: 10-kubeadm-1.11.j2
+    dest: /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+  when: 
+    - inventory_hostname in groups['master']
+    - kubernetes_version | search('1.11') or kubernetes_version | search('1.12')
+    
+- name: Template kubeadm 1.11 (backup)
+  template:
+    src: 10-kubeadm-1.11-backup.j2
+    dest: /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+  when: 
+    - inventory_hostname in groups['backup-master'] or inventory_hostname in groups['minions'] or inventory_hostname in groups['infra']
+    - kubernetes_version | search('1.11') or kubernetes_version | search('1.12') 
+
+- name: detect docker's cgroup-driver
+  shell: docker info 2>/dev/null |grep -i cgroup | cut -d":" -f2 | tr -d " "
+  register: docker_cgroup_driver
+  
+- replace:
+    path: /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+    regexp: '--cgroup-driver=(systemd|cgroupfs)'
+    replace: '--cgroup-driver={{docker_cgroup_driver.stdout}}'
+    backup: no
+
+- name: Set alias k 
+  shell: >
+    echo "alias k='kubectl'" >> /root/.bashrc
+
+- name: Set alias kinfo
+  shell: >
+    echo "alias kinfo='kubectl get svc,po --all-namespaces -o wide'" >> /root/.bashrc
+
+- name: source bashrc
+  shell: source ~/.bashrc
+  args:
+    executable: /bin/bash
+  become: yes
+
+#- name: Copy kubelet.service file
+#  copy:
+#    src: kubelet.service
+#    dest: /etc/systemd/system/kubelet.service
+
+- name: Reload systemd units after changing 10-kubeadm.conf
+  command: systemctl daemon-reload
+
+- name: Start and enable services
+  service:
+    name: "{{ item }}"
+    state: restarted
+    enabled: yes
+  with_items:
+    - docker
+    - kubelet

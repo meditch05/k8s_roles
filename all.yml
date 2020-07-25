@@ -1,0 +1,171 @@
+---
+- name: Install dockers and rpms to all hosts
+  hosts: all
+
+  roles:
+    - role: 0-rpms-install
+      when: 
+        - install_mode == "offline"
+
+- name: Apply common configuration to all hosts
+  hosts: all
+
+  roles:
+    - role: 1-add-uid-gid
+    - role: 2-nfs
+    - role: 3-kube-prerequisite
+
+  gather_facts: true
+  any_errors_fatal: yes
+
+- name: Install docker, kubelet, kubectl, kubeadm, kube-cni
+  hosts: all
+
+  roles:
+    - role: 4-docker-install 
+      when: 
+        - gpu_server == "no" 
+        - install_option == "full" or install_option == "kubernetes"
+
+    - role: 5-kube-install
+      when:
+        - install_option == "full" or install_option == "kubernetes"
+
+- name: kubeadm init & join
+  hosts: all
+
+  roles:
+    - role: 6-kube-init-join
+      when:
+        - master_mode == "no" 
+        - install_option == "full" or install_option == "kubernetes" 
+
+- name: kubeadm init & join
+  hosts: all
+
+  roles:
+    - role: 6-kube-init-join-cluster
+      when: 
+        - master_mode == "yes"
+        - install_option == "full" or install_option == "kubernetes"
+
+- name: Apply the weave-kube 1.6
+  hosts: master
+
+  roles:
+    - role: 8-weave-kube
+      when:
+        - install_option == "full" or install_option == "kubernetes"
+
+- name: Apply the weave-kube 1.6 (Backup)
+  hosts: backup-master
+
+  roles:
+    - role: 8-weave-kube
+      when:
+        - install_option == "full" or install_option == "kubernetes"
+
+- name: Setup Node Taints
+  hosts: infra
+  roles:
+    - role: 7-node-label
+
+- name: Apply the heapster and influxdb
+  hosts: master
+
+  roles:
+    - role: 9-heapster-influxdb
+      when:
+        - install_option == "full" or install_option == "accordion" or install_option == "diamanti"
+    
+    - role: 23-metrics-server
+      when:
+        - install_option == "full" or install_option == "accordion" 
+
+- name: Apply default http backend nginx ingress
+  hosts: master
+
+  roles:
+    - role: 10-default-http-backend-nginx-ingress
+      when:
+        - install_option == "full" or install_option == "accordion"
+
+- name: Apply elasticsearch
+  hosts: master
+
+  roles:
+    - role: 11-elasticsearch-logging
+      when:
+        - install_option == "full" or install_option == "accordion" or install_option == "diamanti"
+
+- name: Creat Accordion namespace
+  hosts: master
+
+  roles:
+    - role: 12-create-ns
+      when:
+        - install_option == "full" or install_option == "accordion" or install_option == "diamanti"
+
+- name: Apply the Docker registry
+  hosts: master
+
+  roles:
+    - role: 13-docker-registry
+      when:
+        - install_option == "full" or install_option == "accordion" or install_option == "diamanti"
+
+- name: Push docker images
+  hosts: master
+
+  roles:
+    - role: 14-push-docker-images
+      when:
+        - install_option == "full" or install_option == "accordion" or install_option == "diamanti"
+
+- name: Set up the Jenkins server
+  hosts: master
+
+  roles:
+    - role: 15-jenkins
+      when:
+        - install_option == "full" or install_option == "accordion" or install_option == "diamanti"
+
+- name: Setup Accordion and Postgres
+  hosts: master
+  roles:
+    - role: 17-accordion
+      when:
+        - install_option == "full" or install_option == "accordion" or install_option == "diamanti"
+    
+- name: Set up the cluster-insight for topology
+  hosts: master
+
+  roles:
+    - role: 16-cluster-insight
+      when:
+        - install_option == "full" or install_option == "accordion" or install_option == "diamanti"
+    
+- name: Terminate standby server
+  hosts: backup-master
+
+  roles:
+    - role: 18-standby-terminate
+      when:
+        - install_option == "full" or install_option == "accordion" or install_option == "diamanti"
+    
+- name: Master copy ca key
+  hosts: backup-master
+
+  roles:
+    - role: 19-copy-cakey
+      when:
+        - install_option == "full" or install_option == "accordion" or install_option == "diamanti"
+    
+- name: Install GPU Monitoring
+  hosts: master
+
+  roles:
+    - role: 22-gpu
+      when: 
+        - gpu_server == "yes" 
+        - install_option == "full" or install_option == "accordion" or install_option == "diamanti"
